@@ -10,17 +10,18 @@
 #include "DC_CommandQueue.h"
 //prototypes
 void PWMInit(void);
-void DCInit(void);
-void motorStop(uint16_t);
+void DCinit(void);
+void motorStop(uint16_t channel);
 void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction);
 
 //global variables
 uint32_t counter[2]	  = {0,0};
 uint8_t  timerDone[2] = {1,1};
 
-void DCInit(void){
-		GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
-		TIM_OC_InitTypeDef  sConfig;
+void DCinit(void){
+	GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
+	TIM_OC_InitTypeDef  sConfig;
+	TIM_HandleTypeDef tim1;
 	// Enabling clock for GPIOs
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 	__HAL_RCC_GPIOB_CLK_ENABLE();
@@ -39,8 +40,8 @@ void DCInit(void){
 	GPIO_InitStruct.Alternate = 0;
 	HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 	//Making sure motors are not activated
-	stopMotor(1);
-	stopMotor(2);
+	motorStop(1);
+	motorStop(2);
 	//configuring TIM1
 	__HAL_RCC_TIM1_CLK_ENABLE();
 	tim1.Instance = TIM1;
@@ -60,12 +61,14 @@ void DCInit(void){
 	sConfig.OCFastMode = TIM_OCFAST_DISABLE;
 	sConfig.OCIdleState = TIM_OCIDLESTATE_RESET;
 	sConfig.OCNIdleState = TIM_OCNIDLESTATE_RESET;
-	  //Enable Interrupts 
-	HAL_NVIC_SetPriority(TIM1_IRQn,0,1); 
-	NVIC_EnableIRQ(TIM1_IRQn);
+	HAL_TIM_PWM_ConfigChannel(&tim1, &sConfig, TIM_CHANNEL_1);
+	HAL_TIM_PWM_ConfigChannel(&tim1, &sConfig, TIM_CHANNEL_2);
+	 //Enable Interrupts 
+	HAL_NVIC_SetPriority(TIM1_UP_TIM16_IRQn, 0, 1);//set to position 0 and priority 1
+	NVIC_EnableIRQ(TIM1_UP_TIM16_IRQn);
 }
-void stopMotor(uint16_t channel){
-	if(channel == 1){
+void motorStop(uint16_t channel){
+	if(channel == 1){	//checking channel
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
 	}
@@ -100,9 +103,10 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
 			if(direction == 1){
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 1);
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
-		}else{
+			}else{
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 0);
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1);
+			}
 		}
 	}
 	TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
@@ -112,7 +116,7 @@ ParserReturnVal_t CmdDCInit(int mode) {
 
 	if (mode != CMD_INTERACTIVE) return CmdReturnOk;
 
-	DCInit();
+	DCinit();
 	return CmdReturnOk;
 }
 ADD_CMD("DCInit", CmdDCInit, "	      Initializes DC motor driver, TIM1 with PWM and interrupt")
@@ -171,11 +175,11 @@ ParserReturnVal_t CmdDC(int mode) {
 }
 ADD_CMD("DC", CmdDC, "<channel><direction><speed><time>  activates selected motor and sets direction, speed and operating time if stop is requested")
 /***************ISR***************/
-// FUNCTION      : TIM1_CC_IRQHandler
+// FUNCTION      : TIM1_UP_IRQHandler
 // DESCRIPTION   : 
 // PARAMETERS    : Nothing
 // RETURNS       : Nothing
-void TIM1_CC_IRQHandler(void) {
+void TIM1_UP_TIM16_IRQHandler(void) {
 
 	TIM1->CR1 &= ~TIM_CR1_CEN; 	//stopping timer
 	if(counter[0] == 0){//checking if channel 1 timed-out
@@ -193,4 +197,5 @@ void TIM1_CC_IRQHandler(void) {
 	TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
 	TIM1 -> SR &= 0xfffe;// Resetting the Update Interrupt Flag (UIF) to 0
 }
+
 
