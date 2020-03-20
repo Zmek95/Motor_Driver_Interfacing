@@ -10,7 +10,7 @@ struct queue* extractFromQueue(uint16_t channel);
 struct queue
 {
   struct queue* next;   //pointer to next node in queue
-  uint16_t speed;
+  uint16_t dutyCycle;
   uint16_t time;
   uint16_t direction;
   uint16_t channel;
