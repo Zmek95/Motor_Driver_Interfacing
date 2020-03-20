@@ -9,8 +9,9 @@
 
 //global variables 
 extern uint16_t timerDone[2];    // flag that is set to 1 when the timer 1 is done.
-extern uint16_t queueCounter; // Counter that records the number of nodes in the command queue.
+extern uint16_t queueCounter[2]; // Counter that records the number of nodes in the command queue.
 extern uint16_t dutyCycle;
+extern uint32_t counter[2];
 
 //function declarations
 void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction);
