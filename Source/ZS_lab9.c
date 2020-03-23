@@ -17,12 +17,13 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction);
 //global variables
 uint32_t counter[2]	  = {0,0};
 uint8_t  timerDone[2] = {1,1};
-float increment = 0; //global for now, will change to local later
+float increment[2] = {0,0}; //global for now, will change to local later
 
 void DCinit(void){
   GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
   TIM_OC_InitTypeDef  sConfig;
   TIM_HandleTypeDef tim1;
+  
   // Enabling clock for GPIOs
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -40,9 +41,11 @@ void DCinit(void){
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   GPIO_InitStruct.Alternate = 0;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  
   //Making sure motors are not activated
   motorStop(1);
   motorStop(2);
+  
   //configuring TIM1
   __HAL_RCC_TIM1_CLK_ENABLE();
   tim1.Instance = TIM1;
@@ -65,9 +68,12 @@ void DCinit(void){
   sConfig.OCNIdleState = TIM_OCNIDLESTATE_RESET;
   HAL_TIM_PWM_ConfigChannel(&tim1, &sConfig, TIM_CHANNEL_1);
   HAL_TIM_PWM_ConfigChannel(&tim1, &sConfig, TIM_CHANNEL_2);
+  
   //Enable Interrupts 
   HAL_NVIC_SetPriority(TIM1_UP_TIM16_IRQn, 0, 1);//set to position 0 and priority 1
   NVIC_EnableIRQ(TIM1_UP_TIM16_IRQn);
+  HAL_NVIC_SetPriority(TIM1_CC_IRQn, 1, 2);//set to position 0 and priority 1
+  NVIC_EnableIRQ(TIM1_CC_IRQn);
 }
 void motorStop(uint16_t channel){
   if(channel == 1){	//checking channel
@@ -87,6 +93,7 @@ void motorStop(uint16_t channel){
 //				   uint16_t direction - direction of rotation
 // RETURNS       : Nothing
 void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
+	
   dutyCycle = dutyCycle * 10;	//scaling up to 1000 microseconds per overflow
   TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
   if (channel == 1) {
@@ -111,6 +118,38 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
     
   }
   TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
+}
+
+void speedProfile(uint16_t channel){
+	
+	float y;//On startup CCR1 and CCR2 registers must be 0, y is the speed of the DC motor
+	if (channel == 1){
+		if(TIM1->CCR1 >= front1->dutyCycle){
+			//do nothing
+			//turn off interrupt
+		}else{
+			increment[0] = increment[0] + 0.0005;
+			y = -140((x-1)*(x-1)*(x-1))*x*x*x;
+			y = 1000 * (y/2.1875);// Convert to a 0 to 1000 scale
+			TIM1->CCR1 = (int) y;
+		}
+	}else if (channel == 2){
+		if(TIM1->CCR2 >= front2->dutyCycle){
+			//do nothing
+			//turn off interrupt
+		}else{
+			increment[1] = increment[1] + 0.0005;
+			y = -140((x-1)*(x-1)*(x-1))*x*x*x;
+			y = 1000 * (y/2.1875);// Convert to a 0 to 1000 scale
+			TIM1->CCR2 = (int) y;
+		}
+	}
+	
+	
+	
+	
+	
+	
 }
 /************************Commands*******************************/
 ParserReturnVal_t CmdDCInit(int mode) {
@@ -216,18 +255,15 @@ void TIM1_UP_TIM16_IRQHandler(void) {
 void TIM1_CC_IRQHandler(void) {
 	//need user entered data
 
-	int channel;
 	float y;//On startup CCR1 and CCR2 registers must be 0, y is the speed of the DC motor
 	increment = increment + 0.0005;
 	//checking interrupt flags
 	if (TIM1->SR & TIM_SR_CC1IF) {	//Capture Compare register 1
-		channel = 1;
-		y = TIM1->CCR1;
+		speedProfile(1);
 		TIM1->SR &= ~TIM_SR_CC1IF;// Resetting the CC1 Interrupt Flag to 0
 	}
 	if (TIM1->SR & TIM_SR_CC2IF) {	//Capture Compare register 2
-		channel = 2;
-		y = TIM1->CCR2;
+		speedProfile(2);
 		TIM1->SR &= ~TIM_SR_CC2IF;// Resetting the CC2 Interrupt Flag to 0
 	}
 	
@@ -236,14 +272,6 @@ void TIM1_CC_IRQHandler(void) {
 	//put DC function here and pass it the duty cycle from function.
 	
 	//If statement here for when the desired speed is reached to skip following block
-	y = -140((x-1)*(x-1)*(x-1))*x*x*x;
-	y = 1000 * (y/2.1875);// Convert to a 0 to 1000 scale
-	if (channel = 1){
-		TIM1->CCR1 = (int) y;
-	}else if (channel = 2){
-		TIM1->CCR2 = (int) y;
-	}
-	
 	
 	
 	TIM1->CR1 |= TIM_CR1_CEN;	//starting timer
