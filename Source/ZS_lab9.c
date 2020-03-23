@@ -130,6 +130,7 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 	
 	//This block is for varying the motor speed before it has come to a stop.
 	if (newDutyCycleFlag == 1){
+		//turn on interrupt
 		
 		if (channel == 1){
 			
@@ -145,11 +146,11 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 			
 		}else if(channel == 2){
 			
-			if(TIM1->CCR2 > front1->dutyCycle){
+			if(TIM1->CCR2 > front2->dutyCycle){
 				if(increment[1] < 0.5){
 					increment[1] = increment + 0.5;
 				}
-			}else if(TIM1->CCR2 < front1->dutyCycle){
+			}else if(TIM1->CCR2 < front2->dutyCycle){
 				if(increment[1] > 0.5){
 					increment[1] = increment - 0.5;
 				}
@@ -159,14 +160,14 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 	}
 	
 	
-	
-	
-	
-	
-	
 	if (channel == 1){
 		//need if statement to check time to start slowing down
-		if(TIM1->CCR1 == front1->dutyCycle){// leaving as equal for now though I suspect rounding errors might cause bugs
+		if (counter[0] == 1000){
+			if(increment[0] < 0.5){
+				increment[0] = increment + 0.5 + 0.0005;
+			}
+			//turn on interrupt
+		}else if(TIM1->CCR1 == front1->dutyCycle){// leaving as equal for now though I suspect rounding errors might cause bugs
 			//do nothing because the desired speed has been reached
 			//turn off interrupt
 		}else{
@@ -176,9 +177,20 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 			y = 1000 * (y/2.1875);// Convert to a 0 to 1000 scale
 			newSpeed = (int) y;
 			TIM1->CCR1 = newSpeed;
+			//Check to stop motor
+			if (increment[0] >= 1){
+				motorStop(1);
+				increment[0] = 0;
+				//turn off interrupt
+			}
 		}
 	}else if (channel == 2){
-		if(TIM1->CCR2 == front2->dutyCycle){
+		if (counter[1] == 1000){
+			if(increment[1] < 0.5){
+				increment[1] = increment + 0.5 + 0.0005;
+			}
+			//turn on interrupt
+		}else if(TIM1->CCR2 == front2->dutyCycle){
 			//do nothing
 			//turn off interrupt
 		}else{
@@ -188,6 +200,12 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 			y = 1000 * (y/2.1875);// Convert to a 0 to 1000 scale
 			newSpeed = (int) y;
 			TIM1->CCR2 = newSpeed;
+			//Check to stop motor
+			if (increment[1] >= 1){
+				motorStop(2);
+				increment[1] = 0;
+				//turn off interrupt
+			}
 		}
 	}
 	
@@ -301,8 +319,6 @@ void TIM1_UP_TIM16_IRQHandler(void) {
 void TIM1_CC_IRQHandler(void) {
 	//need user entered data
 
-	float y;//On startup CCR1 and CCR2 registers must be 0, y is the speed of the DC motor
-	increment = increment + 0.0005;
 	//checking interrupt flags
 	if (TIM1->SR & TIM_SR_CC1IF) {	//Capture Compare register 1
 		speedProfile(1,0);
