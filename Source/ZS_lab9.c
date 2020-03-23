@@ -97,7 +97,8 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
   dutyCycle = dutyCycle * 10;	//scaling up to 1000 microseconds per overflow
   TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
   if (channel == 1) {
-    TIM1->CCR1 = dutyCycle;
+    //TIM1->CCR1 = dutyCycle;
+	speedProfile(1,1);
     if(direction == 1){
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
@@ -107,7 +108,8 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
     }
   }
   else{
-    TIM1->CCR2 = dutyCycle;
+    //TIM1->CCR2 = dutyCycle;
+	speedProfile(2,1);
     if(direction == 1){
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 1);
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
@@ -120,28 +122,72 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
   TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
 }
 
-void speedProfile(uint16_t channel){
+void speedProfile(uint16_t channel,int newDutyCycleFlag){
 	
 	float y;//On startup CCR1 and CCR2 registers must be 0, y is the speed of the DC motor
+	float x;
+	int newSpeed;
+	
+	//This block is for varying the motor speed before it has come to a stop.
+	if (newDutyCycleFlag == 1){
+		
+		if (channel == 1){
+			
+			if(TIM1->CCR1 > front1->dutyCycle){
+				if(increment[0] < 0.5){
+					increment[0] = increment + 0.5;
+				}
+			}else if(TIM1->CCR1 < front1->dutyCycle){
+				if(increment[0] > 0.5){
+					increment[0] = increment - 0.5;
+				}
+			}
+			
+		}else if(channel == 2){
+			
+			if(TIM1->CCR2 > front1->dutyCycle){
+				if(increment[1] < 0.5){
+					increment[1] = increment + 0.5;
+				}
+			}else if(TIM1->CCR2 < front1->dutyCycle){
+				if(increment[1] > 0.5){
+					increment[1] = increment - 0.5;
+				}
+			}
+			
+		}
+	}
+	
+	
+	
+	
+	
+	
+	
 	if (channel == 1){
-		if(TIM1->CCR1 >= front1->dutyCycle){
-			//do nothing
+		//need if statement to check time to start slowing down
+		if(TIM1->CCR1 == front1->dutyCycle){// leaving as equal for now though I suspect rounding errors might cause bugs
+			//do nothing because the desired speed has been reached
 			//turn off interrupt
 		}else{
 			increment[0] = increment[0] + 0.0005;
+			x = increment[0];
 			y = -140((x-1)*(x-1)*(x-1))*x*x*x;
 			y = 1000 * (y/2.1875);// Convert to a 0 to 1000 scale
-			TIM1->CCR1 = (int) y;
+			newSpeed = (int) y;
+			TIM1->CCR1 = newSpeed;
 		}
 	}else if (channel == 2){
-		if(TIM1->CCR2 >= front2->dutyCycle){
+		if(TIM1->CCR2 == front2->dutyCycle){
 			//do nothing
 			//turn off interrupt
 		}else{
 			increment[1] = increment[1] + 0.0005;
+			x = increment[1];
 			y = -140((x-1)*(x-1)*(x-1))*x*x*x;
 			y = 1000 * (y/2.1875);// Convert to a 0 to 1000 scale
-			TIM1->CCR2 = (int) y;
+			newSpeed = (int) y;
+			TIM1->CCR2 = newSpeed;
 		}
 	}
 	
@@ -259,11 +305,11 @@ void TIM1_CC_IRQHandler(void) {
 	increment = increment + 0.0005;
 	//checking interrupt flags
 	if (TIM1->SR & TIM_SR_CC1IF) {	//Capture Compare register 1
-		speedProfile(1);
+		speedProfile(1,0);
 		TIM1->SR &= ~TIM_SR_CC1IF;// Resetting the CC1 Interrupt Flag to 0
 	}
 	if (TIM1->SR & TIM_SR_CC2IF) {	//Capture Compare register 2
-		speedProfile(2);
+		speedProfile(2,0);
 		TIM1->SR &= ~TIM_SR_CC2IF;// Resetting the CC2 Interrupt Flag to 0
 	}
 	
