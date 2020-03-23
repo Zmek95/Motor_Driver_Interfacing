@@ -318,7 +318,7 @@ void TIM1_UP_TIM16_IRQHandler(void) {
 // RETURNS       : Nothing
 void TIM1_CC_IRQHandler(void) {
 	//need user entered data
-
+	TIM1->CR1 &= ~TIM_CR1_CEN; 	//stopping timer
 	//checking interrupt flags
 	if (TIM1->SR & TIM_SR_CC1IF) {	//Capture Compare register 1
 		speedProfile(1,0);
@@ -329,7 +329,7 @@ void TIM1_CC_IRQHandler(void) {
 		TIM1->SR &= ~TIM_SR_CC2IF;// Resetting the CC2 Interrupt Flag to 0
 	}
 	
-	TIM1->CR1 &= ~TIM_CR1_CEN; 	//stopping timer
+	
 	//updating duty cycle on breathing profile function based on mode selected 
 	//put DC function here and pass it the duty cycle from function.
 	
