@@ -201,7 +201,7 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 			if (increment[1] >= 1){
 				motorStop(2);
 				increment[1] = 0;
-				TIM1->DIER &= ~TIM_DIER_CC1IE;
+				TIM1->DIER &= ~TIM_DIER_CC2IE;
 			}
 		}
 	}
