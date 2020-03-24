@@ -18,6 +18,8 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction);
 uint32_t counter[2]	  = {0,0};
 uint8_t  timerDone[2] = {1,1};
 float increment[2] = {0,0}; //global for now, will change to local later
+extern struct queue* front1;
+extern struct queue* front2;
 
 void DCinit(void){
   GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
@@ -125,15 +127,14 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
 void speedProfile(uint16_t channel,int newDutyCycleFlag){
 	
 	float y;//On startup CCR1 and CCR2 registers must be 0, y is the speed of the DC motor
-	float x;
+	float x;//represents the increment in x for the function -140((x-1)^3)*x^3 
+	//-140((x-1)^3)*x^3 is the derivative of a S3 SMOOTHSTEP function 
 	int newSpeed;
 	
 	//This block is for varying the motor speed before it has come to a stop.
 	if (newDutyCycleFlag == 1){
-		//turn on interrupt
-		
 		if (channel == 1){
-			
+			TIM1->DIER |= TIM_DIER_CC1IE;
 			if(TIM1->CCR1 > front1->dutyCycle){
 				if(increment[0] < 0.5){
 					increment[0] = increment + 0.5;
@@ -143,9 +144,8 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 					increment[0] = increment - 0.5;
 				}
 			}
-			
 		}else if(channel == 2){
-			
+			TIM1->DIER |= TIM_DIER_CC2IE;
 			if(TIM1->CCR2 > front2->dutyCycle){
 				if(increment[1] < 0.5){
 					increment[1] = increment + 0.5;
@@ -158,18 +158,15 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 			
 		}
 	}
-	
-	
 	if (channel == 1){
-		//need if statement to check time to start slowing down
 		if (counter[0] == 1000){
 			if(increment[0] < 0.5){
 				increment[0] = increment + 0.5 + 0.0005;
 			}
-			//turn on interrupt
+			TIM1->DIER |= TIM_DIER_CC1IE;
 		}else if(TIM1->CCR1 == front1->dutyCycle){// leaving as equal for now though I suspect rounding errors might cause bugs
 			//do nothing because the desired speed has been reached
-			//turn off interrupt
+			TIM1->DIER &= ~TIM_DIER_CC1IE;
 		}else{
 			increment[0] = increment[0] + 0.0005;
 			x = increment[0];
@@ -181,7 +178,7 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 			if (increment[0] >= 1){
 				motorStop(1);
 				increment[0] = 0;
-				//turn off interrupt
+				TIM1->DIER &= ~TIM_DIER_CC1IE;
 			}
 		}
 	}else if (channel == 2){
@@ -189,10 +186,10 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 			if(increment[1] < 0.5){
 				increment[1] = increment + 0.5 + 0.0005;
 			}
-			//turn on interrupt
+			TIM1->DIER |= TIM_DIER_CC2IE;
 		}else if(TIM1->CCR2 == front2->dutyCycle){
 			//do nothing
-			//turn off interrupt
+			TIM1->DIER &= ~TIM_DIER_CC2IE;
 		}else{
 			increment[1] = increment[1] + 0.0005;
 			x = increment[1];
@@ -204,16 +201,10 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 			if (increment[1] >= 1){
 				motorStop(2);
 				increment[1] = 0;
-				//turn off interrupt
+				TIM1->DIER &= ~TIM_DIER_CC1IE;
 			}
 		}
 	}
-	
-	
-	
-	
-	
-	
 }
 /************************Commands*******************************/
 ParserReturnVal_t CmdDCInit(int mode) {
