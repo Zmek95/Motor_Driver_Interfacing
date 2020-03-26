@@ -10,13 +10,13 @@ uint16_t queueCounter[2] = {0,0}; //counts number of elements in the queue
 /***************************************************************************/
 // FUNCTION      : addToQueue()
 // DESCRIPTION   : This function adds a new node to the queue. 
-//		   This node contains the time, speed, channel, and direction entered by the user along with a pointer to the next node
-// PARAMETERS    : uint16_t time: holds time in milliseconds
+//		   This node contains the time, dutyCycle, channel, and direction entered by the user along with a pointer to the next node
+// PARAMETERS    : uint32_t time: holds time in milliseconds
 // 		   		   uint16_t dutyCycle: holds duty cycle of PWM
 //				   uint16_t direction: holds the direction of rotation
 //				   uint16_t channel: holds the channel number chosen
 // RETURNS       : Nothing
-void addToQueue(uint16_t channel, uint16_t dutyCycle, uint16_t direction, uint16_t time){
+void addToQueue(uint16_t channel, uint16_t dutyCycle, uint16_t direction, uint32_t time){
 	struct queue* newNode = NULL;		//used for pointing to new node
 	newNode = (struct queue*)malloc(sizeof(struct queue));
 
@@ -25,6 +25,7 @@ void addToQueue(uint16_t channel, uint16_t dutyCycle, uint16_t direction, uint16
 		newNode->dutyCycle = dutyCycle;	
 		newNode->time = time;
 		newNode->direction = direction;
+		newNode->channel = channel;
 	}
 	else{
 		printf("No sufficient memory!\n");
@@ -50,12 +51,12 @@ void addToQueue(uint16_t channel, uint16_t dutyCycle, uint16_t direction, uint16
 		rear2 = newNode;   	     //placing new node as head
 		rear2->next = NULL;	    //rear's next pointer points to NULL
 	}
-	queueCounter[channel-1]++;		     //increment number of elements in queue
+	queueCounter[channel-1]++;		     //increment number of elements in queue	
 }
 /***************************************************************************/
 // FUNCTION      : extractFromQueue()
 // DESCRIPTION   : This function extracts the first node in the queue
-//		   This node contains the time and speed entered by the user along with a pointer to the next node
+//		   This node contains the channel, direction, dutyCycle and time entered by the user along with a pointer to the next node
 // PARAMETERS    : Nothing
 // RETURNS       : struct queue* data: this pointer points to the node that contains the information needed (time and speed)
 struct queue* extractFromQueue(uint16_t channel){
@@ -70,7 +71,7 @@ struct queue* extractFromQueue(uint16_t channel){
 		if(front1 == rear1){	
 			front1 = NULL;
 			rear1 = NULL;
-			printf("queue is now empty\n");
+			printf("queue1 is now empty\n");
 		}else{
 			front1 = front1->next;//moving one node back from front of queue1
 		}
@@ -81,13 +82,13 @@ struct queue* extractFromQueue(uint16_t channel){
 		if(front2 == rear2){	
 			front2 = NULL;
 			rear2 = NULL;
-			printf("queue is now empty\n");
+			printf("queue2 is now empty\n");
 		}else{
 			front2 = front2->next;//moving one node back from front of queue2
 		}
 	}	
 	free(pointer); //freeing memory allocated
-	queueCounter[channel-1]--;//decrementing number of elements in queue
+	queueCounter[channel-1]--;//decrementing number of elements in queue	
 	return data;
 }
 
