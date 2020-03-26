@@ -80,8 +80,8 @@ void DCinit(void){
 	 //Enable Interrupts 
 	HAL_NVIC_SetPriority(TIM1_UP_TIM16_IRQn, 0, 1);//set to position 0 and priority 1
 	NVIC_EnableIRQ(TIM1_UP_TIM16_IRQn);
-  HAL_NVIC_SetPriority(TIM1_CC_IRQn, 1, 2);//set to position 0 and priority 1
-  NVIC_EnableIRQ(TIM1_CC_IRQn);
+  	HAL_NVIC_SetPriority(TIM1_CC_IRQn, 1, 2);//set to position 0 and priority 1
+  	NVIC_EnableIRQ(TIM1_CC_IRQn);
 }
 
 void motorStop(uint16_t channel){
@@ -146,9 +146,11 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
   if (newDutyCycleFlag == 1){
     if (channel == 1){
       TIM1->DIER |= TIM_DIER_CC1IE;
-      if(TIM1->CCR1 > front1->dutyCycle){
+      if(TIM1->CCR1 > front1->dutyCycle){//Check if new speed is less than current speed
 	if(increment[0] < 0.5){
-	  increment[0] = increment[0] + 0.5;
+	  increment[0] = increment[0] + 0.5;//For the function -140((x-1)^3)*x^3 when 0<x<0.5 speed increases,
+					    //when 0.5<x<1 speed decreases. When x = 0 or x = 1 speed is zero
+				            //and maximum speed is at x = 0.5
 	}
       }else if(TIM1->CCR1 < front1->dutyCycle){
 	if(increment[0] > 0.5){
@@ -169,10 +171,12 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 			
     }
   }
+	
+//This block contains the calculations for the speed profile
   if (channel == 1){
-    if (counter[0] == 1000){
+    if (counter[0] == 1000){//Start slowing down the motor when counter is at 1000
       if(increment[0] < 0.5){
-	increment[0] = increment[0] + 0.5 + 0.0005;
+	increment[0] = increment[0] + 0.5 + 0.0005;// Shift x to be greater than 5 so incrementing decreases speed
       }
       TIM1->DIER |= TIM_DIER_CC1IE;
     }else if(TIM1->CCR1 == front1->dutyCycle){// leaving as equal for now though I suspect rounding errors might cause bugs
