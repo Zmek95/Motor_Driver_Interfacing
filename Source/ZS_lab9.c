@@ -1,8 +1,8 @@
 /* 	ZS_lab9.c
-*	DC Motor controls
-* 	Programmed by: Shamseddin Elmasri & Ziyad Mekhemer
-*	Date: Mar 19, 2020
-*/
+ *	DC Motor controls
+ * 	Programmed by: Shamseddin Elmasri & Ziyad Mekhemer
+ *	Date: Mar 19, 2020
+ */
 
 #include <stdio.h>
 #include <stdint.h>
@@ -13,10 +13,14 @@
 void DCinit(void);
 void motorStop(uint16_t channel);
 void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction);
+void speedProfile(uint16_t channel,int newDutyCycleFlag);
 
 //global variables
 uint32_t counter[2]	  = {0,0};
 uint8_t  timerDone[2] = {1,1};
+float increment[2] = {0,0}; //global for now, will change to local later
+extern struct queue* front1;
+extern struct queue* front2;
 
 void DCinit(void){
 	GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
@@ -61,6 +65,7 @@ void DCinit(void){
 	TIM1 -> DIER |= 0b1; //setting Update Interrupt Enable bit 
 	TIM1 -> EGR |= 0b1; //setting Update Generation bit 
 	HAL_TIM_Base_Init(&tim1);
+  
 	sConfig.OCMode = TIM_OCMODE_PWM1;
 	sConfig.Pulse = 0;
 	sConfig.OCPolarity = TIM_OCPOLARITY_HIGH;
@@ -75,16 +80,19 @@ void DCinit(void){
 	 //Enable Interrupts 
 	HAL_NVIC_SetPriority(TIM1_UP_TIM16_IRQn, 0, 1);//set to position 0 and priority 1
 	NVIC_EnableIRQ(TIM1_UP_TIM16_IRQn);
+  HAL_NVIC_SetPriority(TIM1_CC_IRQn, 1, 2);//set to position 0 and priority 1
+  NVIC_EnableIRQ(TIM1_CC_IRQn);
 }
+
 void motorStop(uint16_t channel){
-	if(channel == 1){	//checking channel
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-	}
-	else{
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 0);
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
-	}
+  if(channel == 1){	//checking channel
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+  }
+  else{
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 0);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
+  }
 }
 
 // FUNCTION      : DC()
@@ -95,44 +103,127 @@ void motorStop(uint16_t channel){
 // RETURNS       : Nothing
 void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
 	
-	dutyCycle = dutyCycle * 10;	//scaling up to 1000 microseconds per overflow
-	TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
-	if (channel == 1) {
-		TIM1->CCR1 = dutyCycle;
-		TIM1->CCER &= 0xFFFFFFFC;	//enabling channel1 output
+  dutyCycle = dutyCycle * 10;	//scaling up to 1000 microseconds per overflow
+  TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
+  if (channel == 1) {
+    //TIM1->CCR1 = dutyCycle;
+    speedProfile(1,1);
+    TIM1->CCER &= 0xFFFFFFFC;	//enabling channel1 output
 		TIM1->CCER |= 0x01;
-		if(direction == 1){
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-		}else{
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
-		}
-	}
-	else{
-		TIM1->CCR2 = dutyCycle;
-		TIM1->CCER &= 0xFFFFFFCF;	//enabling channel2 output
+    if(direction == 1){
+      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
+      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+    }else{
+      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
+    }
+  }
+  else{
+    //TIM1->CCR2 = dutyCycle;
+    speedProfile(2,1);
+    TIM1->CCER &= 0xFFFFFFCF;	//enabling channel2 output
 		TIM1->CCER |= 0x10;
+    if(direction == 1){
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 1);
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
+    }else{
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 0);
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1);
+    }
+    
+  }
+  TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
+}
 
-		if(direction == 1){
-			if(direction == 1){
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 1);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
-			}else{
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 0);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1);
-			}
-		}
+void speedProfile(uint16_t channel,int newDutyCycleFlag){
+	
+  float y;//On startup CCR1 and CCR2 registers must be 0, y is the speed of the DC motor
+  float x;//represents the increment in x for the function -140((x-1)^3)*x^3 
+  //-140((x-1)^3)*x^3 is the derivative of a S3 SMOOTHSTEP function 
+  int newSpeed;
+	
+  //This block is for varying the motor speed before it has come to a stop.
+  if (newDutyCycleFlag == 1){
+    if (channel == 1){
+      TIM1->DIER |= TIM_DIER_CC1IE;
+      if(TIM1->CCR1 > front1->dutyCycle){
+	if(increment[0] < 0.5){
+	  increment[0] = increment[0] + 0.5;
 	}
-	TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
+      }else if(TIM1->CCR1 < front1->dutyCycle){
+	if(increment[0] > 0.5){
+	  increment[0] = increment[0] - 0.5;
+	}
+      }
+    }else if(channel == 2){
+      TIM1->DIER |= TIM_DIER_CC2IE;
+      if(TIM1->CCR2 > front2->dutyCycle){
+	if(increment[1] < 0.5){
+	  increment[1] = increment[1] + 0.5;
+	}
+      }else if(TIM1->CCR2 < front2->dutyCycle){
+	if(increment[1] > 0.5){
+	  increment[1] = increment[1] - 0.5;
+	}
+      }
+			
+    }
+  }
+  if (channel == 1){
+    if (counter[0] == 1000){
+      if(increment[0] < 0.5){
+	increment[0] = increment[0] + 0.5 + 0.0005;
+      }
+      TIM1->DIER |= TIM_DIER_CC1IE;
+    }else if(TIM1->CCR1 == front1->dutyCycle){// leaving as equal for now though I suspect rounding errors might cause bugs
+      //do nothing because the desired speed has been reached
+      TIM1->DIER &= ~TIM_DIER_CC1IE;
+    }else{
+      increment[0] = increment[0] + 0.0005;
+      x = increment[0];
+      y = -140*((x-1)*(x-1)*(x-1))*x*x*x;
+      y = 1000 * (y/2.1875);// Convert to a 0 to 1000 scale
+      newSpeed = (int) y;
+      TIM1->CCR1 = newSpeed;
+      //Check to stop motor
+      if (increment[0] >= 1){
+	motorStop(1);
+	increment[0] = 0;
+	TIM1->DIER &= ~TIM_DIER_CC1IE;
+      }
+    }
+  }else if (channel == 2){
+    if (counter[1] == 1000){
+      if(increment[1] < 0.5){
+	increment[1] = increment[1] + 0.5 + 0.0005;
+      }
+      TIM1->DIER |= TIM_DIER_CC2IE;
+    }else if(TIM1->CCR2 == front2->dutyCycle){
+      //do nothing
+      TIM1->DIER &= ~TIM_DIER_CC2IE;
+    }else{
+      increment[1] = increment[1] + 0.0005;
+      x = increment[1];
+      y = -140*((x-1)*(x-1)*(x-1))*x*x*x;
+      y = 1000 * (y/2.1875);// Convert to a 0 to 1000 scale
+      newSpeed = (int) y;
+      TIM1->CCR2 = newSpeed;
+      //Check to stop motor
+      if (increment[1] >= 1){
+	motorStop(2);
+	increment[1] = 0;
+	TIM1->DIER &= ~TIM_DIER_CC2IE;
+      }
+    }
+  }
 }
 /************************Commands*******************************/
 ParserReturnVal_t CmdDCInit(int mode) {
 
-	if (mode != CMD_INTERACTIVE) return CmdReturnOk;
+  if (mode != CMD_INTERACTIVE) return CmdReturnOk;
 
-	DCinit();
-	return CmdReturnOk;
+  DCinit();
+  return CmdReturnOk;
 }
 ADD_CMD("DCInit", CmdDCInit, "	      Initializes DC motor driver, TIM1 with PWM and interrupt")
 
@@ -144,7 +235,8 @@ ParserReturnVal_t CmdDC(int mode) {
 	uint32_t time = 0;	   //time in milliseconds
 	uint16_t rc;
 
-	if (mode != CMD_INTERACTIVE) return CmdReturnOk;
+  if (mode != CMD_INTERACTIVE) return CmdReturnOk;
+
 
 	rc = fetch_uint16_arg(&channel);	//inputting channel number from user
 	if (rc) {
@@ -217,6 +309,42 @@ void TIM1_UP_TIM16_IRQHandler(void) {
 	}
 	TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
 	TIM1 -> SR &= 0xfffe;// Resetting the Update Interrupt Flag (UIF) to 0
+
 }
 
+//Use another interrupt TIM1_CC
+//use 2000 points, 100% PWM is at y=2.1875 for the function -140((x-1)^3)*x^3
+//This function is a derivative of a SMOOTHSTEP function 
+//function will operate similar to the lab 8 advanced functions
+//x=1/2 is the global maximium for the function, x<1/2 accel profile, x>1/2 deccel profile
+//CCR register is edited with new PWM value every cycle until it reaches desired PWM point
+//To check for the desired PWM speed use greater than equality e.g for 40% duty cycle for 1000 period
+//CCR1 -> 400, the function is a 1000 points at 500 100% duty cycle is reached speed desired is at (0.4*2.1875)
+//quantify 2.1875 into 500 points
 
+// FUNCTION      : TIM1_CC_IRQHandler
+// DESCRIPTION   : Interrupt for controlling the PWM duty cycle for BreathingPWM for the TIM1 CC register.
+// PARAMETERS    : Nothing
+// RETURNS       : Nothing
+void TIM1_CC_IRQHandler(void) {
+  //need user entered data
+  TIM1->CR1 &= ~TIM_CR1_CEN; 	//stopping timer
+  //checking interrupt flags
+  if (TIM1->SR & TIM_SR_CC1IF) {	//Capture Compare register 1
+    speedProfile(1,0);
+    TIM1->SR &= ~TIM_SR_CC1IF;// Resetting the CC1 Interrupt Flag to 0
+  }
+  if (TIM1->SR & TIM_SR_CC2IF) {	//Capture Compare register 2
+    speedProfile(2,0);
+    TIM1->SR &= ~TIM_SR_CC2IF;// Resetting the CC2 Interrupt Flag to 0
+  }
+	
+	
+  //updating duty cycle on breathing profile function based on mode selected 
+  //put DC function here and pass it the duty cycle from function.
+	
+  //If statement here for when the desired speed is reached to skip following block
+	
+	
+  TIM1->CR1 |= TIM_CR1_CEN;	//starting timer
+}
