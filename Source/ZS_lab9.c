@@ -18,7 +18,7 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag);
 //global variables
 uint32_t counter[2]	  = {0,0};
 uint8_t  timerDone[2] = {1,1};
-float increment[2] = {0,0}; //global for now, will change to local later
+float increment[2] = {0,0}; 
 extern struct queue* front1;
 extern struct queue* front2;
 
@@ -65,7 +65,7 @@ void DCinit(void){
 	TIM1 -> DIER |= 0b1; //setting Update Interrupt Enable bit 
 	TIM1 -> EGR |= 0b1; //setting Update Generation bit 
 	HAL_TIM_Base_Init(&tim1);
-  
+  	//Configuring PWM
 	sConfig.OCMode = TIM_OCMODE_PWM1;
 	sConfig.Pulse = 0;
 	sConfig.OCPolarity = TIM_OCPOLARITY_HIGH;
@@ -109,7 +109,7 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
     //TIM1->CCR1 = dutyCycle;
     speedProfile(1,1);
     TIM1->CCER &= 0xFFFFFFFC;	//enabling channel1 output
-		TIM1->CCER |= 0x01;
+    TIM1->CCER |= 0x01;
     if(direction == 1){
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
@@ -122,7 +122,7 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
     //TIM1->CCR2 = dutyCycle;
     speedProfile(2,1);
     TIM1->CCER &= 0xFFFFFFCF;	//enabling channel2 output
-		TIM1->CCER |= 0x10;
+    TIM1->CCER |= 0x10;
     if(direction == 1){
       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 1);
       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
