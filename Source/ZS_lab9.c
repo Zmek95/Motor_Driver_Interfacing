@@ -8,8 +8,11 @@
 #include <stdint.h>
 #include "common.h"
 #include "DC_CommandQueue.h"
+//defines
+#define INCREMENT 0.0005
+#define MAXIMUM 2.1875 //The global maximum of the function -140((x-1)^3)*x^3 used in the speedProfile function 
+#define MINIMUM 0.027 //This is the lowest value for increment which results to a CCR value of 1 after calculations 
 //prototypes
-//void PWMInit(void);
 void DCinit(void);
 void motorStop(uint16_t channel);
 void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction);
@@ -18,7 +21,7 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag);
 //global variables
 uint32_t counter[2]	  = {0,0};
 uint8_t  timerDone[2] = {1,1};
-float increment[2] = {0.027,0.027};//used to store the current speed for the speedProfile function
+float increment[2] = {MINIMUM,MINIMUM};//used to store the current speed for the speedProfile function
 uint16_t dutyCycleProfile[2];
 
 void DCinit(void){
@@ -103,7 +106,7 @@ void motorStop(uint16_t channel){
 // RETURNS       : Nothing
 void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
 	
-  dutyCycle = dutyCycle * 10;	//scaling up to 1000 microseconds per overflow
+  dutyCycle = dutyCycle * 10;	//scaling up to 1000 microseconds per overflow for a period of a 1000
   TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
   if (channel == 1) {
     //TIM1->CCR1 = dutyCycle;
@@ -150,87 +153,87 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
   int newSpeed;	
 
   //This block is for varying the motor speed before it has come to a stop anad a new duty cycle has been entered.
+  //The function used is symmetrcial over the x = 1/2 axis for 0 <= x <= 1 
   if (newDutyCycleFlag == 1){
     if (channel == 1){
       TIM1->DIER |= TIM_DIER_CC1IE;
       if(TIM1->CCR1 > dutyCycleProfile[0]){//Check if new speed is less than current speed
-	if(increment[0] < 0.5){
-	  increment[0] = increment[0] + 0.5;//For the function -140((x-1)^3)*x^3 when 0<x<0.5 speed increases,
-					    //when 0.5<x<1 speed decreases. When x = 0 or x = 1 speed is zero
-				            //and maximum speed is at x = 0.5
-	}
-      }else if(TIM1->CCR1 < dutyCycleProfile[0]){
-	if(increment[0] > 0.5){
-	  increment[0] = increment[0] - 0.5;
-	}
-      }
+		if(increment[0] < 0.5){
+		  increment[0] = increment[0] + (0.5 - increment[0]);//For the function -140((x-1)^3)*x^3 when 0<x<0.5 speed increases,
+															 //when 0.5<x<1 speed decreases. When x = 0 or x = 1 speed is zero
+															 //and maximum speed is at x = 0.5
+		}
+		}else if(TIM1->CCR1 < dutyCycleProfile[0]){
+			if(increment[0] > 0.5){
+			  increment[0] = increment[0] - (increment[0] - 0.5);
+			}
+		}
     }else if(channel == 2){
-      TIM1->DIER |= TIM_DIER_CC2IE;
-      if(TIM1->CCR2 > dutyCycleProfile[1]){
-	if(increment[1] < 0.5){
-	  increment[1] = increment[1] + 0.5;
-	}
-      }else if(TIM1->CCR2 < dutyCycleProfile[1]){
-	if(increment[1] > 0.5){
-	  increment[1] = increment[1] - 0.5;
-	}
-      }
+	  TIM1->DIER |= TIM_DIER_CC2IE;
+	  if(TIM1->CCR2 > dutyCycleProfile[1]){
+		if(increment[1] < 0.5){
+		  increment[1] = increment[1] + (0.5 - increment[0]);
+		}
+	  }else if(TIM1->CCR2 < dutyCycleProfile[1]){
+		if(increment[1] > 0.5){
+		  increment[1] = increment[1] - (increment[0] - 0.5);
+		}
+	  }
 			
     }
   }
 	
   //This block contains the calculations for the speed profile
   if (channel == 1){
-    if (counter[0] == 1000){//Start slowing down the motor when counter is at 1000
-	printf("counter = 1000\n");
+    if (counter[0] == tim1.Init.Period){//Start slowing down the motor when counter is at the last period
       if(increment[0] < 0.5){
-	increment[0] = increment[0] + 0.5 + 0.0005;// Shift x to be greater than 5 so incrementing decreases speed
+		increment[0] = increment[0] + (0.5 - increment[0]) + INCREMENT;// Shift x to be greater than 0.5 so incrementing decreases speed
       }
       TIM1->DIER |= TIM_DIER_CC1IE;
-    }else if(TIM1->CCR1 >= (dutyCycleProfile[0] - 10) && TIM1->CCR1 <= (dutyCycleProfile[0] + 10) && counter [0] > 1000){// leaving as equal for now though I suspect rounding errors might cause bugs
-      //do nothing because the desired speed has been reached
-	//printf("stabilize\n");
+    }else if(TIM1->CCR1 >= (dutyCycleProfile[0] - 10) && TIM1->CCR1 <= (dutyCycleProfile[0] + 10) && counter [0] > tim1.Init.Period){
+	  TIM1->CCR1 = dutyCycleProfile[0];
+      //do nothing because the desired speed has been reached within a 1% error margin
       //TIM1->DIER &= ~TIM_DIER_CC1IE;
     }else{
-      increment[0] = increment[0] + 0.0005;
+      increment[0] = increment[0] + INCREMENT;
       x = increment[0];
       y = -140*((x-1)*(x-1)*(x-1))*x*x*x;
-      y = 1000 * (y/2.1875);// Convert to a 0 to 1000 scale
+      y = tim1.Init.Period * (y/MAXIMUM);// Convert to a 0 to 1000 scale for a period of a 1000
       newSpeed = (int) y;
-      //printf("speed = %i\n", newSpeed);
       TIM1->CCR1 = newSpeed;
       //Check to stop motor
-      if (increment[0] >= 1){
-	motorStop(1);
-	increment[0] = 0.027;
-	TIM1->DIER &= ~TIM_DIER_CC1IE;
+      if (increment[0] >= (1-MINIMUM)){
+		motorStop(1);
+		increment[0] = MINIMUM;
+		TIM1->DIER &= ~TIM_DIER_CC1IE;
       }
     }
   }else if (channel == 2){
-    if (counter[1] == 1000){
+    if (counter[1] == tim1.Init.Period){
       if(increment[1] < 0.5){
-	increment[1] = increment[1] + 0.5 + 0.0005;
+		increment[1] = increment[1] + (0.5 - increment[1]) + INCREMENT;
       }
       TIM1->DIER |= TIM_DIER_CC2IE;
-    }else if(TIM1->CCR2 == dutyCycleProfile[1]){
+    }else if(TIM1->CCR2 >= (dutyCycleProfile[1] - 10) && TIM1->CCR1 <= (dutyCycleProfile[1] + 10) && counter [1] > tim1.Init.Period){
+	  TIM1->CCR2 = dutyCycleProfile[1];
       //do nothing
-      TIM1->DIER &= ~TIM_DIER_CC2IE;
+      //TIM1->DIER &= ~TIM_DIER_CC2IE;
     }else{
-      increment[1] = increment[1] + 0.0005;
+      increment[1] = increment[1] + INCREMENT;
       x = increment[1];
       y = -140*((x-1)*(x-1)*(x-1))*x*x*x;
-      y = 1000 * (y/2.1875);// Convert to a 0 to 1000 scale
+      y = tim1.Init.Period * (y/MAXIMUM);// Convert to a 0 to 1000 scale for a period of a 1000
       newSpeed = (int) y;
       TIM1->CCR2 = newSpeed;
       //Check to stop motor
-      if (increment[1] >= 1){
-	motorStop(2);
-	increment[1] = 0.027;
-	TIM1->DIER &= ~TIM_DIER_CC2IE;
+      if (increment[1] >= (1-MINIMUM)){
+		motorStop(2);
+		increment[1] = MINIMUM;
+		TIM1->DIER &= ~TIM_DIER_CC2IE;
       }
     }
   }
-  printf("TIM1->CCR1 %li\n", TIM1->CCR1);
+  
 }
 /************************Commands*******************************/
 ParserReturnVal_t CmdDCInit(int mode) {
