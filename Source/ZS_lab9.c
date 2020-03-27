@@ -20,9 +20,9 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction);
 void speedProfile(uint16_t channel,int newDutyCycleFlag);
 
 //global variables
-uint32_t counter[2]	= {0,0};
-uint8_t  timerDone[2] 	= {1,1};
-float increment[2] 	= {MINIMUM,MINIMUM};//used to store the current speed for the speedProfile function
+uint32_t counter[2]	  = {0,0};
+uint8_t  timerDone[2] = {1,1};
+float increment[2] = {MINIMUM,MINIMUM};//used to store the current speed for the speedProfile function
 uint16_t dutyCycleProfile[2];
 
 void DCinit(void){
@@ -109,6 +109,7 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
 	
   dutyCycle = dutyCycle * 10;	//scaling up to 1000 microseconds per overflow for a period of a 1000
   TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
+  
   if (channel == 1) {
     //TIM1->CCR1 = dutyCycle;
     dutyCycleProfile[0] = dutyCycle;
@@ -123,7 +124,7 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
     }
   }
-  else{
+  else if(channel == 2){
     //TIM1->CCR2 = dutyCycle;
     dutyCycleProfile[1] = dutyCycle;
     speedProfile(2,1);
@@ -160,24 +161,24 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
       TIM1->DIER |= TIM_DIER_CC1IE;
       if(TIM1->CCR1 > dutyCycleProfile[0]){//Check if new speed is less than current speed
 	if(increment[0] < 0.5){
-	  increment[0] = increment[0] + (0.5 - increment[0]);//For the function -140((x-1)^3)*x^3 when 0<x<0.5 speed increases,
+	  increment[0] = 1 - increment[0];//For the function -140((x-1)^3)*x^3 when 0<x<0.5 speed increases,
 	                                                     //when 0.5<x<1 speed decreases. When x = 0 or x = 1 speed is zero
 	                                                     //and maximum speed is at x = 0.5
 	}
       }else if(TIM1->CCR1 < dutyCycleProfile[0]){
 	if(increment[0] > 0.5){
-	  increment[0] = increment[0] - (increment[0] - 0.5);
+	  increment[0] = 1 - increment[0];
 	}
       }
     }else if(channel == 2){
       TIM1->DIER |= TIM_DIER_CC2IE;
       if(TIM1->CCR2 > dutyCycleProfile[1]){
 	if(increment[1] < 0.5){
-	  increment[1] = increment[1] + (0.5 - increment[0]);
+	  increment[1] = 1 - increment[1];
 	}
       }else if(TIM1->CCR2 < dutyCycleProfile[1]){
 	if(increment[1] > 0.5){
-	  increment[1] = increment[1] - (increment[0] - 0.5);
+	  increment[1] = 1 - increment[1];
 	}
       }
 			
@@ -188,7 +189,7 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
   if (channel == 1){
     if (counter[0] == PERIOD){//Start slowing down the motor when counter is at the last period
       if(increment[0] < 0.5){
-	increment[0] = increment[0] + (0.5 - increment[0]) + INCREMENT;// Shift x to be greater than 0.5 so incrementing decreases speed
+	increment[0] = (1 - increment[0]) + INCREMENT;// Shift x to be greater than 0.5 so incrementing decreases speed
       }
       TIM1->DIER |= TIM_DIER_CC1IE;
     }else if(TIM1->CCR1 >= (dutyCycleProfile[0] - 10) && TIM1->CCR1 <= (dutyCycleProfile[0] + 10) && counter [0] > PERIOD){
@@ -212,7 +213,7 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
   }else if (channel == 2){
     if (counter[1] == PERIOD){
       if(increment[1] < 0.5){
-	increment[1] = increment[1] + (0.5 - increment[1]) + INCREMENT;
+	increment[1] = (1 - increment[1]) + INCREMENT;
       }
       TIM1->DIER |= TIM_DIER_CC2IE;
     }else if(TIM1->CCR2 >= (dutyCycleProfile[1] - 10) && TIM1->CCR1 <= (dutyCycleProfile[1] + 10) && counter [1] > PERIOD){
