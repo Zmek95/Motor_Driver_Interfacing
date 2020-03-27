@@ -11,7 +11,8 @@
 //defines
 #define INCREMENT 0.0005
 #define MAXIMUM 2.1875 //The global maximum of the function -140((x-1)^3)*x^3 used in the speedProfile function 
-#define MINIMUM 0.027 //This is the lowest value for increment which results to a CCR value of 1 after calculations 
+#define MINIMUM 0.027 //This is the lowest value for increment which results to a CCR value of 1 after calculations
+#define PERIOD 1000
 //prototypes
 void DCinit(void);
 void motorStop(uint16_t channel);
@@ -60,7 +61,7 @@ void DCinit(void){
   tim1.Instance = TIM1;
   tim1.Init.Prescaler = HAL_RCC_GetPCLK2Freq() / 1000000 - 1;
   tim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  tim1.Init.Period = 1000;
+  tim1.Init.Period = PERIOD;
   tim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   tim1.Init.RepetitionCounter = 0;
   //TIM1->CR1 &= ~(TIM_CR1_URS);
@@ -158,78 +159,78 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
     if (channel == 1){
       TIM1->DIER |= TIM_DIER_CC1IE;
       if(TIM1->CCR1 > dutyCycleProfile[0]){//Check if new speed is less than current speed
-		if(increment[0] < 0.5){
-		  increment[0] = increment[0] + (0.5 - increment[0]);//For the function -140((x-1)^3)*x^3 when 0<x<0.5 speed increases,
-															 //when 0.5<x<1 speed decreases. When x = 0 or x = 1 speed is zero
-															 //and maximum speed is at x = 0.5
-		}
-		}else if(TIM1->CCR1 < dutyCycleProfile[0]){
-			if(increment[0] > 0.5){
-			  increment[0] = increment[0] - (increment[0] - 0.5);
-			}
-		}
+	if(increment[0] < 0.5){
+	  increment[0] = increment[0] + (0.5 - increment[0]);//For the function -140((x-1)^3)*x^3 when 0<x<0.5 speed increases,
+	                                                     //when 0.5<x<1 speed decreases. When x = 0 or x = 1 speed is zero
+	                                                     //and maximum speed is at x = 0.5
+	}
+      }else if(TIM1->CCR1 < dutyCycleProfile[0]){
+	if(increment[0] > 0.5){
+	  increment[0] = increment[0] - (increment[0] - 0.5);
+	}
+      }
     }else if(channel == 2){
-	  TIM1->DIER |= TIM_DIER_CC2IE;
-	  if(TIM1->CCR2 > dutyCycleProfile[1]){
-		if(increment[1] < 0.5){
-		  increment[1] = increment[1] + (0.5 - increment[0]);
-		}
-	  }else if(TIM1->CCR2 < dutyCycleProfile[1]){
-		if(increment[1] > 0.5){
-		  increment[1] = increment[1] - (increment[0] - 0.5);
-		}
-	  }
+      TIM1->DIER |= TIM_DIER_CC2IE;
+      if(TIM1->CCR2 > dutyCycleProfile[1]){
+	if(increment[1] < 0.5){
+	  increment[1] = increment[1] + (0.5 - increment[0]);
+	}
+      }else if(TIM1->CCR2 < dutyCycleProfile[1]){
+	if(increment[1] > 0.5){
+	  increment[1] = increment[1] - (increment[0] - 0.5);
+	}
+      }
 			
     }
   }
 	
   //This block contains the calculations for the speed profile
   if (channel == 1){
-    if (counter[0] == tim1.Init.Period){//Start slowing down the motor when counter is at the last period
+    if (counter[0] == PERIOD){//Start slowing down the motor when counter is at the last period
       if(increment[0] < 0.5){
-		increment[0] = increment[0] + (0.5 - increment[0]) + INCREMENT;// Shift x to be greater than 0.5 so incrementing decreases speed
+	increment[0] = increment[0] + (0.5 - increment[0]) + INCREMENT;// Shift x to be greater than 0.5 so incrementing decreases speed
       }
       TIM1->DIER |= TIM_DIER_CC1IE;
-    }else if(TIM1->CCR1 >= (dutyCycleProfile[0] - 10) && TIM1->CCR1 <= (dutyCycleProfile[0] + 10) && counter [0] > tim1.Init.Period){
-	  TIM1->CCR1 = dutyCycleProfile[0];
+    }else if(TIM1->CCR1 >= (dutyCycleProfile[0] - 10) && TIM1->CCR1 <= (dutyCycleProfile[0] + 10) && counter [0] > PERIOD){
+      TIM1->CCR1 = dutyCycleProfile[0];
       //do nothing because the desired speed has been reached within a 1% error margin
       //TIM1->DIER &= ~TIM_DIER_CC1IE;
     }else{
       increment[0] = increment[0] + INCREMENT;
       x = increment[0];
       y = -140*((x-1)*(x-1)*(x-1))*x*x*x;
-      y = tim1.Init.Period * (y/MAXIMUM);// Convert to a 0 to 1000 scale for a period of a 1000
+      y = PERIOD * (y/MAXIMUM);// Convert to a 0 to 1000 scale for a period of a 1000
       newSpeed = (int) y;
       TIM1->CCR1 = newSpeed;
       //Check to stop motor
       if (increment[0] >= (1-MINIMUM)){
-		motorStop(1);
-		increment[0] = MINIMUM;
-		TIM1->DIER &= ~TIM_DIER_CC1IE;
+	motorStop(1);
+	increment[0] = MINIMUM;
+	TIM1->DIER &= ~TIM_DIER_CC1IE;
       }
     }
   }else if (channel == 2){
-    if (counter[1] == tim1.Init.Period){
+    if (counter[1] == PERIOD){
       if(increment[1] < 0.5){
-		increment[1] = increment[1] + (0.5 - increment[1]) + INCREMENT;
+	increment[1] = increment[1] + (0.5 - increment[1]) + INCREMENT;
       }
       TIM1->DIER |= TIM_DIER_CC2IE;
-    }else if(TIM1->CCR2 >= (dutyCycleProfile[1] - 10) && TIM1->CCR1 <= (dutyCycleProfile[1] + 10) && counter [1] > tim1.Init.Period){
-	  TIM1->CCR2 = dutyCycleProfile[1];
+    }else if(TIM1->CCR2 >= (dutyCycleProfile[1] - 10) && TIM1->CCR1 <= (dutyCycleProfile[1] + 10) && counter [1] > PERIOD){
+      TIM1->CCR2 = dutyCycleProfile[1];
       //do nothing
       //TIM1->DIER &= ~TIM_DIER_CC2IE;
     }else{
       increment[1] = increment[1] + INCREMENT;
       x = increment[1];
       y = -140*((x-1)*(x-1)*(x-1))*x*x*x;
-      y = tim1.Init.Period * (y/MAXIMUM);// Convert to a 0 to 1000 scale for a period of a 1000
+      y = PERIOD * (y/MAXIMUM);// Convert to a 0 to 1000 scale for a period of a 1000
       newSpeed = (int) y;
       TIM1->CCR2 = newSpeed;
       //Check to stop motor
       if (increment[1] >= (1-MINIMUM)){
-		motorStop(2);
-		increment[1] = MINIMUM;
-		TIM1->DIER &= ~TIM_DIER_CC2IE;
+	motorStop(2);
+	increment[1] = MINIMUM;
+	TIM1->DIER &= ~TIM_DIER_CC2IE;
       }
     }
   }
