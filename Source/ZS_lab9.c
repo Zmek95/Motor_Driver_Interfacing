@@ -182,14 +182,15 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
   //This block contains the calculations for the speed profile
   if (channel == 1){
     if (counter[0] == 1000){//Start slowing down the motor when counter is at 1000
+	printf("counter = 1000\n");
       if(increment[0] < 0.5){
 	increment[0] = increment[0] + 0.5 + 0.0005;// Shift x to be greater than 5 so incrementing decreases speed
       }
       TIM1->DIER |= TIM_DIER_CC1IE;
-    }else if(TIM1->CCR1 >= (dutyCycleProfile[0] - 50) && TIM1->CCR1 <= (dutyCycleProfile[0] + 50)){// leaving as equal for now though I suspect rounding errors might cause bugs
+    }else if(TIM1->CCR1 >= (dutyCycleProfile[0] - 10) && TIM1->CCR1 <= (dutyCycleProfile[0] + 10) && counter [0] > 1000){// leaving as equal for now though I suspect rounding errors might cause bugs
       //do nothing because the desired speed has been reached
-	printf("stabilize\n");
-      TIM1->DIER &= ~TIM_DIER_CC1IE;
+	//printf("stabilize\n");
+      //TIM1->DIER &= ~TIM_DIER_CC1IE;
     }else{
       increment[0] = increment[0] + 0.0005;
       x = increment[0];
@@ -229,7 +230,7 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
       }
     }
   }
-  printf("dutyCycle[0] %i\n", dutyCycleProfile[0]);
+  printf("TIM1->CCR1 %li\n", TIM1->CCR1);
 }
 /************************Commands*******************************/
 ParserReturnVal_t CmdDCInit(int mode) {
