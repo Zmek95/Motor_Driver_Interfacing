@@ -20,9 +20,9 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction);
 void speedProfile(uint16_t channel,int newDutyCycleFlag);
 
 //global variables
-uint32_t counter[2]	  = {0,0};
-uint8_t  timerDone[2] = {1,1};
-float increment[2] = {MINIMUM,MINIMUM};//used to store the current speed for the speedProfile function
+uint32_t counter[2]	= {0,0};
+uint8_t  timerDone[2] 	= {1,1};
+float increment[2] 	= {MINIMUM,MINIMUM};//used to store the current speed for the speedProfile function
 uint16_t dutyCycleProfile[2];
 
 void DCinit(void){
