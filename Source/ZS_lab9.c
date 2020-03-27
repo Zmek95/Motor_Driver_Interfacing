@@ -13,14 +13,13 @@
 void DCinit(void);
 void motorStop(uint16_t channel);
 void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction);
-void speedProfile(uint16_t channel,int newDutyCycleFlag, uint16_t dutyCyc);
+void speedProfile(uint16_t channel,int newDutyCycleFlag);
 
 //global variables
 uint32_t counter[2]	  = {0,0};
 uint8_t  timerDone[2] = {1,1};
 float increment[2] = {0.027,0.027};//used to store the current speed for the speedProfile function
-extern struct queue* front1;
-extern struct queue* front2;
+uint16_t dutyCycleProfile[2];
 
 void DCinit(void){
   GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
@@ -108,7 +107,8 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
   TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
   if (channel == 1) {
     //TIM1->CCR1 = dutyCycle;
-    speedProfile(1,1, dutyCycle);
+    dutyCycleProfile[0] = dutyCycle;
+    speedProfile(1,1);
     TIM1->CCER &= 0xFFFFFFFC;	//enabling channel1 output
     TIM1->CCER |= 0x01;
     if(direction == 1){
@@ -121,7 +121,8 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
   }
   else{
     //TIM1->CCR2 = dutyCycle;
-    speedProfile(2,1, dutyCycle);
+    dutyCycleProfile[1] = dutyCycle;
+    speedProfile(2,1);
     TIM1->CCER &= 0xFFFFFFCF;	//enabling channel2 output
     TIM1->CCER |= 0x10;
     if(direction == 1){
@@ -141,42 +142,35 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
 // PARAMETERS    : uint16_t channel - 2 channels that can generate PWM waveforms independently
 //                 int newDutyCycleFlag - This flag is for checking whether a new duty cycle has been entered by the user
 // RETURNS       : Nothing
-void speedProfile(uint16_t channel,int newDutyCycleFlag, uint16_t dutyCyc){
+void speedProfile(uint16_t channel,int newDutyCycleFlag){
 
-  static uint16_t dutyCycle[2];	
   float y;//On startup CCR1 and CCR2 registers must be 0, y is the speed of the DC motor
   float x;//represents the increment in x for the function -140((x-1)^3)*x^3 
           //-140((x-1)^3)*x^3 is the derivative of a S3 SMOOTHSTEP function 
   int newSpeed;	
-	if(dutyCycle != 0){		
-		if(channel == 1){
-			dutyCycle[0] = dutyCyc;
-		}else{
-			dutyCycle[1] = dutyCyc;
-		}
-	}
+
   //This block is for varying the motor speed before it has come to a stop anad a new duty cycle has been entered.
   if (newDutyCycleFlag == 1){
     if (channel == 1){
       TIM1->DIER |= TIM_DIER_CC1IE;
-      if(TIM1->CCR1 > dutyCycle[0]){//Check if new speed is less than current speed
+      if(TIM1->CCR1 > dutyCycleProfile[0]){//Check if new speed is less than current speed
 	if(increment[0] < 0.5){
 	  increment[0] = increment[0] + 0.5;//For the function -140((x-1)^3)*x^3 when 0<x<0.5 speed increases,
 					    //when 0.5<x<1 speed decreases. When x = 0 or x = 1 speed is zero
 				            //and maximum speed is at x = 0.5
 	}
-      }else if(TIM1->CCR1 < dutyCycle[0]){
+      }else if(TIM1->CCR1 < dutyCycleProfile[0]){
 	if(increment[0] > 0.5){
 	  increment[0] = increment[0] - 0.5;
 	}
       }
     }else if(channel == 2){
       TIM1->DIER |= TIM_DIER_CC2IE;
-      if(TIM1->CCR2 > dutyCycle[1]){
+      if(TIM1->CCR2 > dutyCycleProfile[1]){
 	if(increment[1] < 0.5){
 	  increment[1] = increment[1] + 0.5;
 	}
-      }else if(TIM1->CCR2 < dutyCycle[1]){
+      }else if(TIM1->CCR2 < dutyCycleProfile[1]){
 	if(increment[1] > 0.5){
 	  increment[1] = increment[1] - 0.5;
 	}
@@ -192,7 +186,7 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag, uint16_t dutyCyc){
 	increment[0] = increment[0] + 0.5 + 0.0005;// Shift x to be greater than 5 so incrementing decreases speed
       }
       TIM1->DIER |= TIM_DIER_CC1IE;
-    }else if(TIM1->CCR1 >= dutyCycle[0] - 50 && TIM1->CCR1 <= dutyCycle[0] + 50){// leaving as equal for now though I suspect rounding errors might cause bugs
+    }else if(TIM1->CCR1 >= (dutyCycleProfile[0] - 50) && TIM1->CCR1 <= (dutyCycleProfile[0] + 50)){// leaving as equal for now though I suspect rounding errors might cause bugs
       //do nothing because the desired speed has been reached
 	printf("stabilize\n");
       TIM1->DIER &= ~TIM_DIER_CC1IE;
@@ -217,7 +211,7 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag, uint16_t dutyCyc){
 	increment[1] = increment[1] + 0.5 + 0.0005;
       }
       TIM1->DIER |= TIM_DIER_CC2IE;
-    }else if(TIM1->CCR2 == dutyCycle[1]){
+    }else if(TIM1->CCR2 == dutyCycleProfile[1]){
       //do nothing
       TIM1->DIER &= ~TIM_DIER_CC2IE;
     }else{
@@ -235,7 +229,7 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag, uint16_t dutyCyc){
       }
     }
   }
-printf("dutyCycle[0] %i\n", dutyCycle[0]);
+  printf("dutyCycle[0] %i\n", dutyCycleProfile[0]);
 }
 /************************Commands*******************************/
 ParserReturnVal_t CmdDCInit(int mode) {
@@ -351,11 +345,11 @@ void TIM1_CC_IRQHandler(void) {
   TIM1->CR1 &= ~TIM_CR1_CEN; 	//stopping timer
   //checking interrupt flags
   if (TIM1->SR & TIM_SR_CC1IF) {	//Capture Compare register 1
-    speedProfile(1,0,0);
+    speedProfile(1,0);
     TIM1->SR &= ~TIM_SR_CC1IF;// Resetting the CC1 Interrupt Flag to 0
   }
   if (TIM1->SR & TIM_SR_CC2IF) {	//Capture Compare register 2
-    speedProfile(2,0,0);
+    speedProfile(2,0);
     TIM1->SR &= ~TIM_SR_CC2IF;// Resetting the CC2 Interrupt Flag to 0
   }	
   TIM1->CR1 |= TIM_CR1_CEN;	//starting timer
