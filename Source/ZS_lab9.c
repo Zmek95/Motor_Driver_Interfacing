@@ -187,10 +187,8 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 	
   //This block contains the calculations for the speed profile
   if (channel == 1){
-    if (counter[0] == PERIOD){//Start slowing down the motor when counter is at the last period
-      if(increment[0] < 0.5){
-	increment[0] = (1 - increment[0]) + INCREMENT;// Shift x to be greater than 0.5 so incrementing decreases speed
-      }
+    if ((counter[0] < PERIOD) && (increment[0] < 0.5)){//Start slowing down the motor when counter is at the last period
+      increment[0] = (1 - increment[0]) + INCREMENT;// Shift x to be greater than 0.5 so incrementing decreases speed
       TIM1->DIER |= TIM_DIER_CC1IE;
     }else if(TIM1->CCR1 >= (dutyCycleProfile[0] - 10) && TIM1->CCR1 <= (dutyCycleProfile[0] + 10) && counter [0] > PERIOD){
       TIM1->CCR1 = dutyCycleProfile[0];
@@ -211,10 +209,8 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
       }
     }
   }else if (channel == 2){
-    if (counter[1] == PERIOD){
-      if(increment[1] < 0.5){
-	increment[1] = (1 - increment[1]) + INCREMENT;
-      }
+    if ((counter[1] < PERIOD) && (increment[1] < 0.5)){
+      increment[1] = (1 - increment[1]) + INCREMENT;
       TIM1->DIER |= TIM_DIER_CC2IE;
     }else if(TIM1->CCR2 >= (dutyCycleProfile[1] - 10) && TIM1->CCR1 <= (dutyCycleProfile[1] + 10) && counter [1] > PERIOD){
       TIM1->CCR2 = dutyCycleProfile[1];
