@@ -4,9 +4,9 @@
 #include <ctype.h>
 #include <string.h>
 #include "common.h"
-//#include "DC_CommandQueue.h" //header file for queue
 #include "main.h"		  // This include will give us the CubeMX generated defines
 
+//prototypes
 void checkQueue(void);
 
 /* This function is called from the CubeMX generated main.c, after all
