@@ -23,7 +23,7 @@ void checkQueue(void);
 uint32_t counter[2]	  = {0,0};
 uint8_t  timerDone[2] = {1,1};
 float increment[2] = {MINIMUM,MINIMUM};//used to store the current speed for the speedProfile function
-uint16_t dutyCycleProfile[2];
+uint16_t dutyCycleProfile[2];//Stores the current duty cycle
 extern uint16_t queueCounter[2];
 
 
@@ -113,7 +113,6 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
   TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
   
   if (channel == 1) {
-    //TIM1->CCR1 = dutyCycle;
     dutyCycleProfile[0] = dutyCycle;
     speedProfile(1,1);
     TIM1->CCER &= 0xFFFFFFFC;	//enabling channel1 output
@@ -127,7 +126,6 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
     }
   }
   else if(channel == 2){
-    //TIM1->CCR2 = dutyCycle;
     dutyCycleProfile[1] = dutyCycle;
     speedProfile(2,1);
     TIM1->CCER &= 0xFFFFFFCF;	//enabling channel2 output
@@ -195,7 +193,6 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
     }else if(TIM1->CCR1 >= (dutyCycleProfile[0] - 10) && TIM1->CCR1 <= (dutyCycleProfile[0] + 10) && counter [0] > PERIOD){
       TIM1->CCR1 = dutyCycleProfile[0];
       //do nothing because the desired speed has been reached within a 1% error margin
-      //TIM1->DIER &= ~TIM_DIER_CC1IE;
     }else{
       increment[0] = increment[0] + INCREMENT;
       x = increment[0];
@@ -217,7 +214,6 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
     }else if(TIM1->CCR2 >= (dutyCycleProfile[1] - 10) && TIM1->CCR1 <= (dutyCycleProfile[1] + 10) && counter [1] > PERIOD){
       TIM1->CCR2 = dutyCycleProfile[1];
       //do nothing
-      //TIM1->DIER &= ~TIM_DIER_CC2IE;
     }else{
       increment[1] = increment[1] + INCREMENT;
       x = increment[1];
