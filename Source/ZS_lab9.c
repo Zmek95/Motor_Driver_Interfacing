@@ -238,7 +238,7 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
 void checkQueue(void){
 	struct queue data;// used to point to the node in the queue that has the data that will be read.
 	for(int i=0;i<2;i++){
-		if(queueCounter[i] > 0 && (counter[i] < (PERIOD + 100) || timerDone[i] = 1)){ //checking if queue is not empty and channel is not busy
+		if(queueCounter[i] > 0 && ((counter[i] < (PERIOD + 100)) || (timerDone[i] == 1))){ //checking if queue is not empty and channel is not busy
 			if (timerDone[i] == 1){
 				timerDone[i] = 0;      //setting flag for channel as busy
 			}
