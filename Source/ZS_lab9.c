@@ -244,8 +244,8 @@ void checkQueue(void){
 			if(data.direction == 0){
 				motorStop(i+1);				//stopping motor
 			}else{
-				DC(data.channel, data.dutyCycle, data.direction);
-				counter[i] = data.time; //calculating the number of overflows needed	
+				counter[i] = data.time; //calculating the number of overflows needed
+				DC(data.channel, data.dutyCycle, data.direction);	
 			}	
     		}
   	}	
