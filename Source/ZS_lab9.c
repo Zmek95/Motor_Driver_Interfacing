@@ -347,16 +347,6 @@ void TIM1_UP_TIM16_IRQHandler(void) {
 
 }
 
-//Use another interrupt TIM1_CC
-//use 2000 points, 100% PWM is at y=2.1875 for the function -140((x-1)^3)*x^3
-//This function is a derivative of a SMOOTHSTEP function 
-//function will operate similar to the lab 8 advanced functions
-//x=1/2 is the global maximium for the function, x<1/2 accel profile, x>1/2 deccel profile
-//CCR register is edited with new PWM value every cycle until it reaches desired PWM point
-//To check for the desired PWM speed use greater than equality e.g for 40% duty cycle for 1000 period
-//CCR1 -> 400, the function is a 1000 points at 500 100% duty cycle is reached speed desired is at (0.4*2.1875)
-//quantify 2.1875 into 500 points
-
 // FUNCTION      : TIM1_CC_IRQHandler
 // DESCRIPTION   : Interrupt that executes the speedProfile function everytime the counter compare register matches the counter.
 // PARAMETERS    : Nothing
