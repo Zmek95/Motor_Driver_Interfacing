@@ -13,10 +13,12 @@
 void DCinit(void);
 void motorStop(uint16_t channel);
 void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction);
+void checkQueue(void);
 
 //global variables
 uint32_t counter[2]	  = {0,0};
 uint8_t  timerDone[2] = {1,1};
+extern uint16_t queueCounter[2];
 
 void DCinit(void){
 	GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
@@ -126,6 +128,21 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
 	}
 	TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
 }
+void checkQueue(void){
+	struct queue data;// used to point to the node in the queue that has the data that will be read.
+	for(int i=0;i<2;i++){
+		if(queueCounter[i] > 0 && timerDone[i] == 1){ //checking if queue is not empty and channel is not busy
+			timerDone[i] = 0;      //setting flag for channel as busy
+			data = extractFromQueue(i+1);   //extracting the first node's data from queue
+			if(data.direction == 0){
+				motorStop(i+1);				//stopping motor
+			}else{
+				DC(data.channel, data.dutyCycle, data.direction);
+				counter[i] = data.time; //calculating the number of overflows needed	
+			}	
+    		}
+  	}	
+}
 /************************Commands*******************************/
 ParserReturnVal_t CmdDCInit(int mode) {
 
@@ -218,5 +235,4 @@ void TIM1_UP_TIM16_IRQHandler(void) {
 	TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
 	TIM1 -> SR &= 0xfffe;// Resetting the Update Interrupt Flag (UIF) to 0
 }
-
 
