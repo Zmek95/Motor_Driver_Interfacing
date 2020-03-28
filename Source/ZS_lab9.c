@@ -3,7 +3,6 @@
  * 	Programmed by: Shamseddin Elmasri & Ziyad Mekhemer
  *	Date: Mar 19, 2020
  */
-
 #include <stdio.h>
 #include <stdint.h>
 #include "common.h"
@@ -12,7 +11,7 @@
 #define INCREMENT 0.0005 //The increment along the function -140((x-1)^3)*x^3 from x= 0 to x = 1 (2000 points in this case)
 #define MAXIMUM 2.1875 //The global maximum of the function -140((x-1)^3)*x^3 used in the speedProfile function 
 #define MINIMUM 0.027 //This is the lowest value for increment which results to a CCR value of 1 after calculations
-#define PERIOD 1000
+#define PERIOD 1000   //Speed starts to change when time left equals PERIOD (1000 ms)
 //prototypes
 void DCinit(void);
 void motorStop(uint16_t channel);
@@ -20,13 +19,16 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction);
 void speedProfile(uint16_t channel,int newDutyCycleFlag);
 void checkQueue(void);
 //global variables
-uint32_t counter[2]	  = {0,0};
-uint8_t  timerDone[2] = {1,1};
+uint32_t counter[2] = {0,0}; //used to store number of overflows left for timer
+uint8_t  timerDone[2] = {1,1}; //flag used to indicate if timer is running during an motor operation
 float increment[2] = {MINIMUM,MINIMUM};//used to store the current speed for the speedProfile function
 uint16_t dutyCycleProfile[2];//Stores the current duty cycle
-extern uint16_t queueCounter[2];
-
-
+extern uint16_t queueCounter[2]; //counts number of commands for each channel
+/**********************************Functions**********************************/
+// FUNCTION      : DCinit()
+// DESCRIPTION   : This function initializes the GPIOs, timer1 channels 1 & 2 as PWM, stops motors, and enables interrupt for overflow and capture/compare
+// PARAMETERS    : Nothing
+// RETURNS       : Nothing
 void DCinit(void){
   GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
   TIM_OC_InitTypeDef  sConfig;
@@ -66,7 +68,7 @@ void DCinit(void){
   tim1.Init.Period = PERIOD;
   tim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   tim1.Init.RepetitionCounter = 0;
-  //TIM1->CR1 &= ~(TIM_CR1_URS);
+  //Configuring enable bits for TIM1
   TIM1 -> CR1 |= (TIM_CR1_URS); //only counter over/under flow generates interrupt
   TIM1 -> DIER |= 0b1; //setting Update Interrupt Enable bit 
   TIM1 -> EGR |= 0b1; //setting Update Generation bit 
@@ -89,14 +91,17 @@ void DCinit(void){
   HAL_NVIC_SetPriority(TIM1_CC_IRQn, 1, 2);
   NVIC_EnableIRQ(TIM1_CC_IRQn);
 }
-
+// FUNCTION      : motorStop()
+// DESCRIPTION   : This function stops a particular motor based on channel number passed
+// PARAMETERS    : uint16_t channel - represents the motor needed to be stopped
+// RETURNS       : Nothing
 void motorStop(uint16_t channel){
   if(channel == 1){	//checking channel
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0); //creating zero potential between motor 1 terminals
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
   }
   else{
-    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 0);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 0); //creating zero potential between motor 2 terminals
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
   }
 }
@@ -360,4 +365,3 @@ void TIM1_CC_IRQHandler(void) {
   }	
   TIM1->CR1 |= TIM_CR1_CEN;	//starting timer
 }
-
