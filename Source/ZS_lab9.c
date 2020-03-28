@@ -225,19 +225,26 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
     }
   }
 }
+// FUNCTION      : checkQueue()
+// DESCRIPTION   : This function checks if queue has pending commands
+// PARAMETERS    : uint16_t channel - 2 channels that can generate PWM waveforms independently
+//                 uint16_t dutyCycle - duty cycle for the PWM waveform
+//		   uint16_t direction - direction of rotation
+// RETURNS       : Nothing
 void checkQueue(void){
-	struct queue data;// used to point to the node in the queue that has the data that will be read.
-	for(int i=0;i<2;i++){
-		if(queueCounter[i] > 0 && ((counter[i] < (PERIOD + 100)) || (timerDone[i] == 1))){ //checking if queue is not empty and channel is not busy
+	struct queue data;    // used to point to the node in the queue that has the data that will be read.
+	for(int i=0;i<2;i++){ // checking both channels for pending commands
+	        //checking if queue is not empty and channel is not busy, and compensating for time needed for speed change
+		if(queueCounter[i] > 0 && ((counter[i] < (PERIOD + 100)) || (timerDone[i] == 1))){ 
 			if (timerDone[i] == 1){
 				timerDone[i] = 0;      //setting flag for channel as busy
 			}
 			data = extractFromQueue(i+1);   //extracting the first node's data from queue
 			if(data.direction == 0){
-				motorStop(i+1);				//stopping motor
+				motorStop(i+1);		//stopping motor
 			}else{
 				counter[i] = data.time; //calculating the number of overflows needed
-				DC(data.channel, data.dutyCycle, data.direction);	
+				DC(data.channel, data.dutyCycle, data.direction); //setting channel, duty cycle, and direction
 			}	
     		}
   	}	
@@ -246,22 +253,20 @@ void checkQueue(void){
 ParserReturnVal_t CmdDCInit(int mode) {
 
   if (mode != CMD_INTERACTIVE) return CmdReturnOk;
-
   DCinit();
   return CmdReturnOk;
 }
-ADD_CMD("DCInit", CmdDCInit, "	      Initializes DC motor driver, TIM1 with PWM and interrupt")
+ADD_CMD("DCInit", CmdDCInit, "	      Initializes DC motor driver, TIM1 channels 1 & 2 as PWM, and enables interrupt")
 
 ParserReturnVal_t CmdDC(int mode) {
 
-  uint16_t channel = 0;  //used to choose which motor to be activated
-  uint16_t dutyCycle = 0;//used to control speed of motor
-  uint16_t direction = 0;//used to set direction of rotation
-  uint32_t time = 0;	   //time in milliseconds
+  uint16_t channel = 0;   //used to choose which motor to be activated
+  uint16_t dutyCycle = 0; //used to control speed of motor
+  uint16_t direction = 0; //used to set direction of rotation
+  uint32_t time = 0;	  //time in milliseconds
   uint16_t rc;
 
   if (mode != CMD_INTERACTIVE) return CmdReturnOk;
-
 
   rc = fetch_uint16_arg(&channel);	//inputting channel number from user
   if (rc) {
@@ -273,7 +278,7 @@ ParserReturnVal_t CmdDC(int mode) {
     printf("Please select direction of rotation\n");
     return CmdReturnBadParameter3;
   }
-  if(direction == 1 || direction == 2){
+  if(direction == 1 || direction == 2){ //checking if break is not requested
     rc = fetch_uint32_arg(&time);	//inputting direction number from user
     if (rc) {
       printf("Please enter time in milliseconds\n");
@@ -304,39 +309,36 @@ ParserReturnVal_t CmdDC(int mode) {
   addToQueue(channel, dutyCycle, direction, time);
   return CmdReturnOk;
 }
-ADD_CMD("DC", CmdDC, "<channel><direction><time><speed>  activates selected motor and sets direction, speed and operating time if stop is requested")
-/***************ISR***************/
+ADD_CMD("DC", CmdDC, "<channel><direction><time><speed>  activates selected motor and sets direction, speed and operating time")
+/***************************ISR****************************/
 // FUNCTION      : TIM1_UP_IRQHandler
-// DESCRIPTION   : 
+// DESCRIPTION   : This ISR is visited everytime TIM1 overflows. counter[] is used to track the remaining time
 // PARAMETERS    : Nothing
 // RETURNS       : Nothing
 void TIM1_UP_TIM16_IRQHandler(void) {
-	
+  
   TIM1->CR1 &= ~TIM_CR1_CEN; 	//stopping timer
-	
-  if(counter[0] == 0){//checking if channel 1 timed-out
-    motorStop(1);	//stopping motor 1
-    TIM1->CCER &= 0xFFFFFFFE;	//disabling channel1 output
+  if(counter[0] == 0){          //checking if channel 1 timed-out
+    motorStop(1); 	        //stopping motor 1
+    TIM1->CCER &= 0xFFFFFFFE;	//disabling channel 1 output
     TIM1->CCER |= 0x04;
-    timerDone[0] = 1;
+    timerDone[0] = 1;           //flag raised to indicate that channel 1 is not busy
   }
   else{
     counter[0]--;
   }	
-  if(counter[1] == 0){//checking if channel 2 timed-out
-    motorStop(2);	//stopping motor 2
-    TIM1->CCER &= 0xFFFFFFEF;	//disabling channel2 output
+  if(counter[1] == 0){          //checking if channel 2 timed-out
+    motorStop(2);	        //stopping motor 2
+    TIM1->CCER &= 0xFFFFFFEF;	//disabling channel 2 output
     TIM1->CCER |= 0x40;
-    timerDone[1] = 1;
+    timerDone[1] = 1;           //flag raised to indicate that channel 2 is not busy
   }
   else{
     counter[1]--;
   }
   TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
-  TIM1 -> SR &= 0xfffe;// Resetting the Update Interrupt Flag (UIF) to 0
-
+  TIM1 -> SR &= 0xfffe;         // Resetting the Update Interrupt Flag (UIF) to 0
 }
-
 // FUNCTION      : TIM1_CC_IRQHandler
 // DESCRIPTION   : Interrupt that executes the speedProfile function everytime the counter compare register matches the counter.
 // PARAMETERS    : Nothing
@@ -352,5 +354,5 @@ void TIM1_CC_IRQHandler(void) {
     speedProfile(2,0);
     TIM1->SR &= ~TIM_SR_CC2IF;// Resetting the CC2 Interrupt Flag to 0
   }	
-  TIM1->CR1 |= TIM_CR1_CEN;	//starting timer
+  TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
 }
