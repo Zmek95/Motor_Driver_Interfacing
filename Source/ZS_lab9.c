@@ -18,12 +18,14 @@ void DCinit(void);
 void motorStop(uint16_t channel);
 void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction);
 void speedProfile(uint16_t channel,int newDutyCycleFlag);
-
+void checkQueue(void);
 //global variables
 uint32_t counter[2]	  = {0,0};
 uint8_t  timerDone[2] = {1,1};
 float increment[2] = {MINIMUM,MINIMUM};//used to store the current speed for the speedProfile function
 uint16_t dutyCycleProfile[2];
+extern uint16_t queueCounter[2];
+
 
 void DCinit(void){
   GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
@@ -233,6 +235,21 @@ void speedProfile(uint16_t channel,int newDutyCycleFlag){
   }
   
 }
+void checkQueue(void){
+	struct queue data;// used to point to the node in the queue that has the data that will be read.
+	for(int i=0;i<2;i++){
+		if(queueCounter[i] > 0 && timerDone[i] == 1){ //checking if queue is not empty and channel is not busy
+			timerDone[i] = 0;      //setting flag for channel as busy
+			data = extractFromQueue(i+1);   //extracting the first node's data from queue
+			if(data.direction == 0){
+				motorStop(i+1);				//stopping motor
+			}else{
+				DC(data.channel, data.dutyCycle, data.direction);
+				counter[i] = data.time; //calculating the number of overflows needed	
+			}	
+    		}
+  	}	
+}
 /************************Commands*******************************/
 ParserReturnVal_t CmdDCInit(int mode) {
 
@@ -356,3 +373,4 @@ void TIM1_CC_IRQHandler(void) {
   }	
   TIM1->CR1 |= TIM_CR1_CEN;	//starting timer
 }
+

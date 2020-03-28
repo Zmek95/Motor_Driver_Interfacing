@@ -59,14 +59,14 @@ void addToQueue(uint16_t channel, uint16_t dutyCycle, uint16_t direction, uint32
 //		   This node contains the channel, direction, dutyCycle and time entered by the user along with a pointer to the next node
 // PARAMETERS    : Nothing
 // RETURNS       : struct queue* data: this pointer points to the node that contains the information needed (time and speed)
-struct queue* extractFromQueue(uint16_t channel){
+struct queue extractFromQueue(uint16_t channel){
 	
 	struct queue* pointer = NULL; //temporary pointer
-	struct queue* data = NULL;    //pointer will be used to point to first node in queue
+	struct queue data;    //instance used as temporary hold the front node 
 	
 	if(channel == 1){
-		data = front1; 	//copying address of node containing data
-		pointer = front1;//pointing to front of queue1
+		data = *front1; 	//copying content of node containing data
+		pointer = front1;	//copying address of node containing data
 		//checking if queue1 has only one node left
 		if(front1 == rear1){	
 			front1 = NULL;
@@ -76,8 +76,8 @@ struct queue* extractFromQueue(uint16_t channel){
 			front1 = front1->next;//moving one node back from front of queue1
 		}
 	}else{
-		data = front2; 	//copying address of node containing data
-		pointer = front2;//pointing to front of queue2
+		data = *front2; 	//copying content of node containing data
+		pointer = front2;	//copying address of node containing data
 		//checking if queue2 has only one node left
 		if(front2 == rear2){	
 			front2 = NULL;
@@ -91,13 +91,3 @@ struct queue* extractFromQueue(uint16_t channel){
 	queueCounter[channel-1]--;//decrementing number of elements in queue	
 	return data;
 }
-
-
-
-
-
-
-
-
-
-
