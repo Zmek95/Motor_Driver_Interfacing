@@ -9,7 +9,7 @@
 #include "common.h"
 #include "DC_CommandQueue.h"
 //defines
-#define INCREMENT 0.0005
+#define INCREMENT 0.0005 //The increment along the function -140((x-1)^3)*x^3 from x= 0 to x = 1 (2000 points in this case)
 #define MAXIMUM 2.1875 //The global maximum of the function -140((x-1)^3)*x^3 used in the speedProfile function 
 #define MINIMUM 0.027 //This is the lowest value for increment which results to a CCR value of 1 after calculations
 #define PERIOD 1000
