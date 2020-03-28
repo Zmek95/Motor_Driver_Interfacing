@@ -105,24 +105,23 @@ void motorStop(uint16_t channel){
     HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
   }
 }
-
 // FUNCTION      : DC()
-// DESCRIPTION   : Sets the duty cycle for the PWM waveform for a specified channel 
+// DESCRIPTION   : This function sets the duty cycle for the PWM waveform for a specified channel, and controls the rotational direction of the specified motor
 // PARAMETERS    : uint16_t channel - 2 channels that can generate PWM waveforms independently
 //                 uint16_t dutyCycle - duty cycle for the PWM waveform
-//				   uint16_t direction - direction of rotation
+//		   uint16_t direction - direction of rotation
 // RETURNS       : Nothing
 void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
 	
-  dutyCycle = dutyCycle * 10;	//scaling up to 1000 microseconds per overflow for a period of a 1000
+  dutyCycle = dutyCycle * 10;	//scaling up so that 100% duty cycle corresponds to 1000 (pulse = period = 1000)
   TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
-  
+  //checking channel
   if (channel == 1) {
-    dutyCycleProfile[0] = dutyCycle;
-    speedProfile(1,1);
-    TIM1->CCER &= 0xFFFFFFFC;	//enabling channel1 output
+    dutyCycleProfile[0] = dutyCycle; //copying current duty cycle to use later in speed profile
+    speedProfile(1,1);               //setting new duty cycle for channel 1 for smooth speed change
+    TIM1->CCER &= 0xFFFFFFFC;	     //enabling channel1 output
     TIM1->CCER |= 0x01;
-    if(direction == 1){
+    if(direction == 1){              //checking direction
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
       HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
     }else{
@@ -131,22 +130,20 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
     }
   }
   else if(channel == 2){
-    dutyCycleProfile[1] = dutyCycle;
-    speedProfile(2,1);
-    TIM1->CCER &= 0xFFFFFFCF;	//enabling channel2 output
+    dutyCycleProfile[1] = dutyCycle; //copying current duty cycle to use later in speed profile
+    speedProfile(2,1);               //setting new duty cycle for channel 1 for smooth speed change
+    TIM1->CCER &= 0xFFFFFFCF;	     //enabling channel2 output
     TIM1->CCER |= 0x10;
-    if(direction == 1){
+    if(direction == 1){              //checking direction
       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 1);
       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0);
     }else{
       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, 0);
       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1);
-    }
-    
+    } 
   }
   TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
 }
-
 // FUNCTION      : speedProfile
 // DESCRIPTION   : This function applies a speed profile based on a waveform that is similar to an S-waveform for a specified duty cycle
 // PARAMETERS    : uint16_t channel - 2 channels that can generate PWM waveforms independently
