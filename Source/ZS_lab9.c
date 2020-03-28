@@ -149,8 +149,8 @@ void DC(uint16_t channel, uint16_t dutyCycle, uint16_t direction){
 // RETURNS       : Nothing
 void speedProfile(uint16_t channel,int newDutyCycleFlag){
 
-  float y;//On startup CCR1 and CCR2 registers must be 0, y is the speed of the DC motor
-  float x;//represents the increment in x for the function -140((x-1)^3)*x^3 
+  float y;//The final calculated speed of the DC motor
+  float x;//Represents the increment in x for the function -140((x-1)^3)*x^3 
           //-140((x-1)^3)*x^3 is the derivative of a S3 SMOOTHSTEP function 
   int newSpeed;	
 
@@ -348,7 +348,6 @@ void TIM1_UP_TIM16_IRQHandler(void) {
 // PARAMETERS    : Nothing
 // RETURNS       : Nothing
 void TIM1_CC_IRQHandler(void) {
-	//printf("CC\n");
   TIM1->CR1 &= ~TIM_CR1_CEN; 	//stopping timer
   //checking interrupt flags
   if (TIM1->SR & TIM_SR_CC1IF) {	//Capture Compare register 1
