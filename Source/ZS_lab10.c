@@ -28,8 +28,8 @@ TIM_Encoder_InitTypeDef encoderConfig;
 //global variables
 static int direction = 0;	//direction of rotation
 static uint16_t tempCNT;	//used to temporarily hold the value of CNT register
-static uint16_t counter = 0;		//used for position values greater than 65536
-static uint16_t remaining = 0;		//represents the remaining portion of total counts
+static uint16_t counter = 0;	//used for position values greater than 65536
+static uint16_t remaining = 0;	//represents the remaining portion of total counts
 /********************************Functions*******************************/
 // FUNCTION      : encoderInit()
 // DESCRIPTION   : Intializes the GPIO pins, timer 3 channels 1 & 2 in encoder mode, channel 3 in output compare mode with interrupt, timer 1 channel in PWM mode
@@ -158,9 +158,9 @@ void runMotor(uint16_t position){
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
   }else{
-     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
-   }
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
+  }
   TIM3->CCR3 = position;                       //copying position to Campture Compare register
   HAL_TIM_Encoder_Start(&tim3, TIM_CHANNEL_1); //Start Encoder channel 1
   HAL_TIM_Encoder_Start(&tim3, TIM_CHANNEL_2); //Start Encoder channel 2
@@ -173,10 +173,10 @@ void runMotor(uint16_t position){
 // RETURNS       : Nothing
 void DCmotorStop(void){
     
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-    TIM1->CCER &= 0xFFFFFFFE;	//disabling PWM output
-    TIM1->CCER |= 0x04;
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
+  TIM1->CCER &= 0xFFFFFFFE;	//disabling PWM output
+  TIM1->CCER |= 0x04;
 }
 /****************************Commands***********************/
 ParserReturnVal_t CmdEncoderInit(int mode) {
