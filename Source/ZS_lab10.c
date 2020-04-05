@@ -14,7 +14,7 @@ void encoderInit(void);
 uint16_t readEncoder(void);
 void resetPosition(void);
 void runMotor(uint16_t position);
-void DCmotorStop();
+void DCmotorStop(void);
 void DCM_Encoder(void);
 
 //global typeDefs
@@ -28,8 +28,8 @@ TIM_Encoder_InitTypeDef encoderConfig;
 //global variables
 static int direction = 0;	//direction of rotation
 static uint16_t tempCNT;	//used to temporarily hold the value of CNT register
-//static counter = 0;		//used for position values greater than 65536
-//static remaining = 0;		//represents the remaining portion of total counts
+static uint16_t counter = 0;		//used for position values greater than 65536
+static uint16_t remaining = 0;		//represents the remaining portion of total counts
 /********************************Functions*******************************/
 // FUNCTION      : encoderInit()
 // DESCRIPTION   : Intializes the GPIO pins, timer 3 channels 1 & 2 in encoder mode, channel 3 in output compare mode with interrupt, timer 1 channel in PWM mode
@@ -189,12 +189,12 @@ ADD_CMD("EncoderInit", CmdEncoderInit, "			Initializes DC motor, and configure t
 /***********************************************************/
 ParserReturnVal_t CmdreadEncoder(int mode) {
   
-  uint16_t rawValue = 0;   		                //position in raw ticks
-  float positionInDegrees = 0;                          //position in degrees
+  uint32_t rawValue = 0;   		                //position in raw ticks
+  uint32_t positionInDegrees = 0;                          //position in degrees
   if (mode != CMD_INTERACTIVE) return CmdReturnOk;
   rawValue = readEncoder();	                        //Reads the current value from the quadrature encoder
-  positionInDegrees = (float)rawValue * 360 / 198.6;	//converting into degrees
-  printf("Current position: %5.2f degrees\n", positionInDegrees);
+  positionInDegrees = rawValue * 360 / 198.6;	//converting into degrees
+  printf("Current position: %lu degrees\n", positionInDegrees);
   return CmdReturnOk;
 }
 ADD_CMD("readEncoder", CmdreadEncoder, "			prints out current position of motor in degrees")
@@ -209,18 +209,14 @@ ADD_CMD("resetPosition", CmdresetPosition, "			sets current position as zero (re
 /***********************************************************/
 ParserReturnVal_t CmdstopPosition(int mode) {
   
-  float positionInDegrees = 0;                   //position in degrees
-  uint32_t rawValue = 0;   		         //position in raw ticks
+  int32_t positionInDegrees = 0;                   //position in degrees
+  uint16_t rawValue = 0;   		         //position in raw ticks
   uint16_t rc;
 
   if (mode != CMD_INTERACTIVE) return CmdReturnOk;
-  rc = fetch_float_arg(&positionInDegrees);	//inputting position from user
+  rc = fetch_int32_arg(&positionInDegrees);	//inputting position from user
   if (rc) {
     printf("Please select position in degrees\n");
-    return CmdReturnBadParameter1;
-  }
-  if(positionInDegrees > 118794 || positionInDegrees < -118794){     //making sure input doesn't overflow counter
-    printf("position must be between +/- 118794\n");
     return CmdReturnBadParameter1;
   }
   if (positionInDegrees < 0){			  //extracting direction from sign
@@ -230,7 +226,14 @@ ParserReturnVal_t CmdstopPosition(int mode) {
   else{
     direction = 0;
   }
-  rawValue = positionInDegrees * 198.6 / 360;     //converts into raw ticks
+  if(positionInDegrees >= 182){
+    counter = positionInDegrees / 182;
+    remaining = positionInDegrees % 182;
+    remaining *= 198.6 / 360;
+    rawValue = 0xFFFF;
+  }else{
+    rawValue = positionInDegrees * 198.6 / 360;
+  }
   runMotor(rawValue);		  //configures timer and motor for operation
   return CmdReturnOk;
 }
@@ -247,19 +250,27 @@ void TIM3_IRQHandler(void){
   TIM3->CR1 &= ~TIM_CR1_CEN; 	   //stopping timer3
   //checking interrupt flags
   if (TIM3->SR & TIM_SR_CC3IF) {   //Capture Compare register 3
-    DCmotorStop();		   //stopping motor
-    if( direction == 1){
-      tempCNT = TIM3->CNT;	//temporarily storing value of CNT
-      //flipping direction of counting mode
-      tim3.Instance = TIM3;
-      tim3.Init.Prescaler = 0;
-      tim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-      tim3.Init.Period = 0xffff;
-      tim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-      tim3.Init.RepetitionCounter = 0;
-      HAL_TIM_Base_Init(&tim3);
-      HAL_TIM_Encoder_Init(&tim3, &encoderConfig);   //Initialize encoder
-      TIM3->CNT = tempCNT;	//restoring back value of CNT
+    if(counter == 0){
+      DCmotorStop();		   //stopping motor
+      if( direction == 1){
+        tempCNT = TIM3->CNT;	//temporarily storing value of CNT
+        //flipping direction of counting mode
+        tim3.Instance = TIM3;
+        tim3.Init.Prescaler = 0;
+        tim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+        tim3.Init.Period = 0xffff;
+        tim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+        tim3.Init.RepetitionCounter = 0;
+        HAL_TIM_Base_Init(&tim3);
+        HAL_TIM_Encoder_Init(&tim3, &encoderConfig);   //Initialize encoder
+        TIM3->CNT = tempCNT;	//restoring back value of CNT
+      }
+    }else if(counter == 1){
+      TIM3->CCR3 = remaining;
+      counter--;
+    }else{
+      TIM3->CCR3 = 0xFFFF;
+      counter--;
     }
     TIM3->SR &= ~TIM_SR_CC3IF;     // Resetting the CC3 Interrupt Flag to 0
   }	
