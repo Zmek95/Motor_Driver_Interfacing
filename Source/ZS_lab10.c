@@ -1,5 +1,5 @@
-/*	File name: ZS_lab10.c
- *
+/*	File name: ZS_lab10.c    
+ * Quadrature Encoder Lab
  *	Program Desription: This program reads and controls the postion of a DC motor using encoder feedback signal and internal timer in encoder mode
  *	Programmed by: Shamseddin Elmasri & Ziyad Mekhemer
  *
