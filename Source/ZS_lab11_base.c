@@ -15,7 +15,8 @@
 #include <stdint.h>
 #include "common.h"
 
-#define KP 1 //propotional constnat for P type control
+#define KP 1 //propotional constant for P type control
+#define TICKS_PER_REV 198.6
 
 //global variables
 int32_t controlMeasuredSpeed;
@@ -157,15 +158,20 @@ void controlTask(void *data){
 	//allow for 1 second to pass before PID control is applied
 	//PID control
 	if(desiredSpeed > 0 && PIDStartDelay == 0){
-		errorValue = controlMeasuredSpeed - desiredSpeed;
-		if (controlMeasuredSpeed < desiredSpeed){
+		
+		if (controlMeasuredSpeed > desiredSpeed){
 			errorValue = controlMeasuredSpeed - desiredSpeed;
 		}else{
 			errorValue = desiredSpeed - controlMeasuredSpeed;
 		}
 		errorValue = KP * errorValue;
 		if(errorValue != 0){
-			controlAdjustedSpeed = errorValue + desiredSpeed;
+			if(desiredSpeed > controlMeasuredSpeed){
+				controlAdjustedSpeed = errorValue + desiredSpeed;
+			}else{
+				controlAdjustedSpeed = desiredSpeed - errorValue;
+			}
+			//RPM conversion here
 			DC(dutyCycle,direction); //controlAdjustedSpeed needs to be converted to a duty cycle
 		}
 	}else{
@@ -222,7 +228,7 @@ void motorStop(void){
 // PARAMETERS    : uint16_t dutyCycle - duty cycle for the PWM waveform
 //                 uint16_t direction - direction of rotation
 // RETURNS       : Nothing
-void DC(uint16_t dutyCycle, uint16_t direction){//Change duty cycle variable
+void DC(uint16_t dutyCycle, uint16_t direction){//RPM to dutyCycle conversion in this function
 	
 	dutyCycle = dutyCycle * 10;	//scaling up so that 100% duty cycle corresponds to 1000 (pulse = period = 1000)
 	TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
