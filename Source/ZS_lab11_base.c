@@ -24,7 +24,7 @@ int32_t desiredSpeed;
 int PIDStartDelay = 10;
 
 //funtion declarations
-uint16_t readEncoder(void);
+uint16_t readEncoder(void);//might do RPM conversion here
 void motorStop(void);
 void DC(uint16_t dutyCycle, uint16_t direction);
 
@@ -166,7 +166,7 @@ void controlTask(void *data){
 		errorValue = KP * errorValue;
 		if(errorValue != 0){
 			controlAdjustedSpeed = errorValue + desiredSpeed;
-			DC(dutyCycle,direction); 
+			DC(dutyCycle,direction); //controlAdjustedSpeed needs to be converted to a duty cycle
 		}
 	}else{
 		PIDStartDelay--;
@@ -200,12 +200,6 @@ ParserReturnVal_t CmdSetSpeed(int mode) {
 	return CmdReturnOk;
 }
 ADD_CMD("speed", CmdSetSpeed, "	      Prints the speed of the DC motor.")
-
-
-
-
-
-
 
 
 
