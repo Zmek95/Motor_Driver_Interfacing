@@ -18,11 +18,18 @@
 #define TICKS_PER_REV 198.6
 #define MAX_RPM 155 //No - load speed of the motor
 
+//global TypeDefs
+GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
+TIM_OC_InitTypeDef  sConfig;
+TIM_HandleTypeDef tim1;
+TIM_HandleTypeDef tim3;
+TIM_Encoder_InitTypeDef encoderConfig;
 //global variables
 int32_t controlMeasuredSpeed;
 int16_t previousPosition;
 int32_t desiredSpeed;
 int PIDStartDelay = 10;
+uint16_t direction;
 
 //funtion declarations
 uint16_t readEncoder(void);//might do RPM conversion here
@@ -32,10 +39,8 @@ void DC(uint16_t userSpeed, uint16_t direction);
 
 void controlInit(void *data){
 	
-	GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
-	TIM_OC_InitTypeDef  sConfig;
-	TIM_HandleTypeDef tim1;
-	TIM_HandleTypeDef tim3;
+	
+	HAL_StatusTypeDef rc;
 	
 	// Enabling clock for GPIOs
 	__HAL_RCC_GPIOA_CLK_ENABLE();
@@ -193,7 +198,7 @@ ParserReturnVal_t CmdSpeed(int mode) {
 
 	if (mode != CMD_INTERACTIVE) return CmdReturnOk;
 
-	printf("Speed in Ticks %d\n",controlMeasuredSpeed);
+	printf("Speed in Ticks %ld\n",controlMeasuredSpeed);
 	return CmdReturnOk;
 }
 ADD_CMD("speed", CmdSpeed, "	      Prints the speed of the DC motor.")
@@ -201,7 +206,6 @@ ADD_CMD("speed", CmdSpeed, "	      Prints the speed of the DC motor.")
 ParserReturnVal_t CmdSetSpeed(int mode) {
 	//Unit conversions placed here
 	uint16_t userSpeed = 0;//used to control speed of motor (RPM)
-	uint16_t direction = 0;//used to set direction of rotation
 	float RPMtoTicks;
 	uint16_t rc;
 	PIDStartDelay = 10;
