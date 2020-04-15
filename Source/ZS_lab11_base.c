@@ -147,8 +147,8 @@ void controlTask(void *data){
 	
 	uint16_t currentPosition;
 	uint32_t difference;
-	int32_t errorValue;
-	int32_t controlAdjustedSpeed = 0;
+	int32_t errorValue;//Change to float for task 1
+	int32_t controlAdjustedSpeed = 0;//Change to float for task 1
 	uint16_t controlAdjustedSpeedRPM;
 	float TickstoRPM;
 	
