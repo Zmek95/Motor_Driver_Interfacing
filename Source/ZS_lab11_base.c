@@ -5,9 +5,8 @@
  */
  
  /* Remaining tasks
-  * 1. Implement unit conversions in setSpeed command RPM to raw ticks
-  * 2. Change P type control values to use floats or fixed point math
-  * 3. Change DC function to accept raw ticks for dutyCycle then change to PWM % inside the function
+  * 1. Change P type control values to use floats or fixed point math
+  * 
   *
   */
  
@@ -17,6 +16,7 @@
 
 #define KP 1 //propotional constant for P type control
 #define TICKS_PER_REV 198.6
+#define MAX_RPM 155 //No - load speed of the motor
 
 //global variables
 int32_t controlMeasuredSpeed;
@@ -27,7 +27,7 @@ int PIDStartDelay = 10;
 //funtion declarations
 uint16_t readEncoder(void);//might do RPM conversion here
 void motorStop(void);
-void DC(uint16_t dutyCycle, uint16_t direction);
+void DC(uint16_t userSpeed, uint16_t direction);
 
 
 void controlInit(void *data){
@@ -144,7 +144,8 @@ void controlTask(void *data){
 	uint32_t difference;
 	int32_t errorValue;
 	int32_t controlAdjustedSpeed = 0;
-	
+	uint16_t controlAdjustedSpeedRPM;
+	float TickstoRPM;
 	
 	//Speed measurement in ticks per 100ms
 	currentPosition = readEncoder();
@@ -172,7 +173,10 @@ void controlTask(void *data){
 				controlAdjustedSpeed = desiredSpeed - errorValue;
 			}
 			//RPM conversion here
-			DC(dutyCycle,direction); //controlAdjustedSpeed needs to be converted to a duty cycle
+			//(RawTicksValue*600)/198.6
+			TickstoRPM = (float)(controlAdjustedSpeed * 600)/TICKS_PER_REV;
+			controlAdjustedSpeedRPM = (uint16_t) TickstoRPM;
+			DC(controlAdjustedSpeedRPM,direction); //controlAdjustedSpeed needs to be converted to a duty cycle
 		}
 	}else{
 		PIDStartDelay--;
@@ -195,17 +199,32 @@ ParserReturnVal_t CmdSpeed(int mode) {
 ADD_CMD("speed", CmdSpeed, "	      Prints the speed of the DC motor.")
 
 ParserReturnVal_t CmdSetSpeed(int mode) {
-	
+	//Unit conversions placed here
+	uint16_t userSpeed = 0;//used to control speed of motor (RPM)
+	uint16_t direction = 0;//used to set direction of rotation
+	float RPMtoTicks;
+	uint16_t rc;
 	PIDStartDelay = 10;
 	
-	//Unit conversions placed here
-
 	if (mode != CMD_INTERACTIVE) return CmdReturnOk;
+	
+	rc = fetch_uint16_arg(&direction);	//inputting direction number from user
+	if (rc) {
+		printf("Please select direction of rotation\n");
+		return CmdReturnBadParameter1;
+	}
+	rc = fetch_uint16_arg(&userSpeed);	//inputting speed from user
+    if (rc) {
+		printf("Please enter the speed, (0 to 100)\n");
+		return CmdReturnBadParameter2;
+    }
 
-	printf("Speed in Ticks %d\n",controlMeasuredSpeed);
+	//RPM to ticks for desiredSpeed
+	RPMtoTicks = (float)(userSpeed*TICKS_PER_REV)/600;
+	desiredSpeed = (int32_t) RPMtoTicks;
 	return CmdReturnOk;
 }
-ADD_CMD("speed", CmdSetSpeed, "	      Prints the speed of the DC motor.")
+ADD_CMD("setSpeed", CmdSetSpeed, "	      Prints the speed of the DC motor.")
 
 
 
@@ -228,13 +247,16 @@ void motorStop(void){
 // PARAMETERS    : uint16_t dutyCycle - duty cycle for the PWM waveform
 //                 uint16_t direction - direction of rotation
 // RETURNS       : Nothing
-void DC(uint16_t dutyCycle, uint16_t direction){//RPM to dutyCycle conversion in this function
+void DC(uint16_t userSpeed, uint16_t direction){//RPM to dutyCycle conversion in this function
 	
+	float dutyCycle;
+	
+	dutyCycle =((float)userSpeed/MAX_RPM)*100;
 	dutyCycle = dutyCycle * 10;	//scaling up so that 100% duty cycle corresponds to 1000 (pulse = period = 1000)
 	TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
 	//checking channel
   
-	TIM1->CCR1 = dutyCycle;              //setting new duty cycle for channel 1 
+	TIM1->CCR1 = (uint16_t) dutyCycle;              //setting new duty cycle for channel 1 
 	TIM1->CCER &= 0xFFFFFFFC;	     //enabling channel1 output
 	TIM1->CCER |= 0x01;
 	if(direction == 1){              //checking direction
