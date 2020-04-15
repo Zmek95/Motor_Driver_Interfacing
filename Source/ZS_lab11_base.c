@@ -1,7 +1,7 @@
 /* 	ZS_lab11.c
- *	DC Motor controls
+ *	PID DC Motor controls
  * 	Programmed by: Shamseddin Elmasri & Ziyad Mekhemer
- *	Date: Mar 19, 2020
+ *	Date: April 15, 2020
  */
  
  /* Remaining tasks
