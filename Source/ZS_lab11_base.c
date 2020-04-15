@@ -222,6 +222,8 @@ ParserReturnVal_t CmdSetSpeed(int mode) {
 	//RPM to ticks for desiredSpeed
 	RPMtoTicks = (float)(userSpeed*TICKS_PER_REV)/600;
 	desiredSpeed = (int32_t) RPMtoTicks;
+	
+	DC(userSpeed,direction);
 	return CmdReturnOk;
 }
 ADD_CMD("setSpeed", CmdSetSpeed, "	      Prints the speed of the DC motor.")
