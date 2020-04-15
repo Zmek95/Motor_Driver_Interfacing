@@ -5,7 +5,7 @@
  */
  
  /* Remaining tasks
-  * 1. Change P type control values to use floats or fixed point math
+  * None
   * 
   *
   */
@@ -14,7 +14,7 @@
 #include <stdint.h>
 #include "common.h"
 
-#define KP 1 //propotional constant for P type control
+#define KP 0.05 //propotional constant for P type control
 #define TICKS_PER_REV 198.6
 #define MAX_RPM 155 //No - load speed of the motor
 
@@ -147,8 +147,8 @@ void controlTask(void *data){
 	
 	uint16_t currentPosition;
 	uint32_t difference;
-	int32_t errorValue;//Change to float for task 1
-	int32_t controlAdjustedSpeed = 0;//Change to float for task 1
+	float errorValue;//Change to float for task 1
+	float controlAdjustedSpeed = 0;//Change to float for task 1
 	uint16_t controlAdjustedSpeedRPM;
 	float TickstoRPM;
 	
@@ -164,19 +164,12 @@ void controlTask(void *data){
 	//allow for 1 second to pass before PID control is applied
 	//PID control
 	if(desiredSpeed > 0 && PIDStartDelay == 0){
-		
-		if (controlMeasuredSpeed > desiredSpeed){
-			errorValue = controlMeasuredSpeed - desiredSpeed;
-		}else{
-			errorValue = desiredSpeed - controlMeasuredSpeed;
-		}
+		//Negative error values for overshoot, positive error values for undershoot
+		errorValue = desiredSpeed - controlMeasuredSpeed;
 		errorValue = KP * errorValue;
 		if(errorValue != 0){
-			if(desiredSpeed > controlMeasuredSpeed){
-				controlAdjustedSpeed = errorValue + desiredSpeed;
-			}else{
-				controlAdjustedSpeed = desiredSpeed - errorValue;
-			}
+			
+			controlAdjustedSpeed = errorValue + (float)desiredSpeed;
 			//RPM conversion here
 			//(RawTicksValue*600)/198.6
 			TickstoRPM = (float)(controlAdjustedSpeed * 600)/TICKS_PER_REV;
@@ -184,9 +177,8 @@ void controlTask(void *data){
 			DC(controlAdjustedSpeedRPM,direction); //controlAdjustedSpeed needs to be converted to a duty cycle
 		}
 	}else{
-		PIDStartDelay--;
-		if(PIDStartDelay < 0){
-			PIDStartDelay = 0;
+		if(PIDStartDelay >= 0){
+			PIDStartDelay--;
 		}
 	}
 	
