@@ -13,22 +13,21 @@ GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
 ADC_HandleTypeDef hadc;
 
 //prototypes
-void PWMInit(void);
-void adcInit(void);
+void controlInit(void *data);
 void HD44780_Init(void);
 void HD44780_GotoXY(unsigned char x, unsigned char y);
 void HD44780_PutStr(char *str);
-void HD44780_ClrScr(void);
 
 //global variables
-char stringBuffer[16]= {0};     //buffer used to store different datatypes for LCD
+char stringBuffer[16]= {0};     	    //buffer used to store different datatypes for LCD
 volatile uint32_t controlMeasuredSpeed = 0; //used to hold the measured output value
-uint32_t desiredSpeed = 0;
-int Kp = 1;			//proportional constant
-int Kd = 4;			//differential constant
-int32_t proportionalError = 0;
+uint32_t desiredSpeed = 0;		    //holds the desired setpoint value
+int Kp = 1;				    //proportional constant
+int Kd = 4;				    //differential constant
+int32_t proportionalError = 0;		
 int32_t differentialError = 0;
-int32_t previousError = 0;
+int32_t previousError = 0;		    //holds the error from previous sample
+
 /*************Commands****************************/
 
 ParserReturnVal_t CmdSetInput(int mode) {
@@ -38,23 +37,27 @@ ParserReturnVal_t CmdSetInput(int mode) {
   TIM1->CR1 &= ~TIM_CR1_CEN;    		//stopping timer	
   TIM1->CCR1 = desiredSpeed * 65500 / 1738;	//setting desired speed as input
   TIM1->CR1 |= TIM_CR1_CEN;			//resuming timer
-  HAL_ADC_Start_IT(&hadc);			//start ADC
+  HAL_ADC_Start_IT(&hadc);			//starting ADC with interrupt
   return CmdReturnOk;
 }
-ADD_CMD("SetInput", CmdSetInput, "		Sets desired speed 0 - 1738")
+ADD_CMD("SetInput", CmdSetInput, "		Set desired speed (range: 0 to 1738)")
 
 /*******************Tasks**************************/
+// TASK          : controlTask()
+// DESCRIPTION   : Takes a sample of output every 10 ms, and displays the output on LCD every 750 ms
+// PARAMETERS    : void *data
+// RETURNS       : Nothing
 void controlTask(void *data){
 	
-  static int LCDDelay = 0;
-  uint16_t outputPercentage;
+  static int LCDDelay = 0;    //used as counter to set delay between LDC displays
+  uint16_t outputPercentage;  //represents the percentage of output with respect to desired set point
 
     HAL_ADC_Start_IT(&hadc); //taking new sample from output 
 
   //display results on LCD every 750 ms
   if(LCDDelay % 75 == 0){
     outputPercentage = controlMeasuredSpeed * 100 / desiredSpeed ; //calculating percentage of output with respect to desired set point
-    //displaying on LCD line 1
+    //displaying output on LCD line 1
     HD44780_GotoXY(0,0);	
     sprintf(stringBuffer,"%03d prcnt stp",outputPercentage);
     HD44780_PutStr(stringBuffer);
@@ -69,22 +72,31 @@ ADD_TASK(controlTask, controlInit, NULL, 10, "DC motor control task")
 
 
 /***************************ISR****************************/
-
+// FUNCTION      : HAL_ADC_ConvCpltCallback()
+// DESCRIPTION   : Reads the converted sample, calculates and updates the new duty cycle using PD control
+// PARAMETERS    : ADC_HandleTypeDef* hadc1 - pointer to ADC1 peripheral structure
+// RETURNS       : Nothing
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc1)
     {   
-	int32_t newValue = 0; //used to update the duty cycle
-	int32_t errorValue = 0;
+	int32_t newValue = 0;    //used to update the duty cycle
+	int32_t errorValue = 0;  //represents the difference between the input and output values
 
 	if(hadc1->Instance == ADC1){
+
 	  //PID controller code
   	  controlMeasuredSpeed = HAL_ADC_GetValue(&hadc);   //copying result of conversion
-	  errorValue = desiredSpeed - controlMeasuredSpeed; //error = input - output
-	  proportionalError = errorValue;
-	  differentialError = errorValue - previousError;
-	  previousError = errorValue;	//storing current error for next sample's previous error
+
+	  //calculating proportional and differential errors
+	  errorValue = desiredSpeed - controlMeasuredSpeed; 
+	  proportionalError = errorValue;	            
+	  differentialError = errorValue - previousError;   
+
+	  previousError = errorValue;			    //updating previous error for next sample
+
+	  //calculating the new duty cycle
 	  newValue = (proportionalError * Kp) + (differentialError * Kd) + TIM1->CCR1 * 1738 / 65500;
 	  
-	  //setting limits for the new value
+	  //setting limits for the new duty cycle governed by system's hardware
 	  if(newValue > 1738){
 	    newValue = 1738;
 	  }else if(newValue < 0){
@@ -100,6 +112,10 @@ void ADC1_IRQHandler(){
 }
 
 /******************Functions****************************/
+// FUNCTION      : controlInit()
+// DESCRIPTION   : This function initializes timer 1 channel 1 as output, ADC1 channel 6 with interrupt after end of regular conversion, LCD, and associated GPIOs
+// PARAMETERS    : Nothing
+// RETURNS       : Nothing
 void controlInit(void *data){
   
   // Enabling clocks
@@ -165,8 +181,8 @@ void controlInit(void *data){
   HAL_NVIC_SetPriority(ADC1_IRQn, 2, 3);	
   HAL_NVIC_EnableIRQ(ADC1_IRQn);		
   
-  ADC1->IER |= 0x4; //enable end of regular conversion interrupt setting EOCIE bit high
-  ADC1->CR |= 1;  //enabling ADC
+  ADC1->IER |= ADC_IER_EOCIE; //enabling end of regular conversion interrupt
+  ADC1->CR |= ADC_CR_ADEN;    //enabling ADC
   
   HD44780_Init();	//initializing LCD	
 }
