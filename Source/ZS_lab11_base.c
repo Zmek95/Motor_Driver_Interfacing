@@ -233,10 +233,10 @@ ParserReturnVal_t CmdSetSpeed(int mode) {
 		return CmdReturnBadParameter1;
 	}
 	rc = fetch_uint16_arg(&userSpeed);	//inputting speed from user
-    if (rc) {
+	if (rc) {
 		printf("Please enter a valid integer for the speed\n");
 		return CmdReturnBadParameter2;
-    }
+	}
 	
 	if(userDirection > 2){
 		printf("Please enter a valid direction, 0 for stop, 1 for clockwise , 2 for anti-clockwise\n");
