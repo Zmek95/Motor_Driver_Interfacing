@@ -182,20 +182,32 @@ void controlTask(void *data){
 		errorValue = proportionalError + (KI*integralError) + derivativeError;
 		
 		if(errorValue != 0 && PIDStartDelay == 0){
-			
+			/*
+			//reverse direction idea
 			if (errorValue < 0){
 				//reverse motor direction!!!
-				if(direction == 0){//reverse direction
-					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
-					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-				}else{
-					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
-					HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
-				}
+				direction = !direction;//toggle bit
+				errorValue = -errorValue;
+				//RPM conversion here
+				//(RawTicksValue*(60000/SAMPLING_RATE))/198.6
+				TickstoRPM = (float)(errorValue * (60000/SAMPLING_RATE))/TICKS_PER_REV;
+				controlAdjustedSpeedRPM = (uint16_t) TickstoRPM;
+				DC(controlAdjustedSpeedRPM,direction); //error needs to be converted to a duty cycle
+				direction = !direction;
+			}else{
+				//RPM conversion here
+				//(RawTicksValue*(60000/SAMPLING_RATE))/198.6
+				TickstoRPM = (float)(errorValue * (60000/SAMPLING_RATE))/TICKS_PER_REV;
+				controlAdjustedSpeedRPM = (uint16_t) TickstoRPM;
+				DC(controlAdjustedSpeedRPM,direction); //error needs to be converted to a duty cycle
 			}
+			*/
+			
+			
+			controlAdjustedSpeed = errorValue + controlAdjustedSpeed;
 			//RPM conversion here
 			//(RawTicksValue*(60000/SAMPLING_RATE))/198.6
-			TickstoRPM = (float)(errorValue * (60000/SAMPLING_RATE))/TICKS_PER_REV;
+			TickstoRPM = (float)(controlAdjustedSpeed * (60000/SAMPLING_RATE))/TICKS_PER_REV;
 			controlAdjustedSpeedRPM = (uint16_t) TickstoRPM;
 			DC(controlAdjustedSpeedRPM,direction); //error needs to be converted to a duty cycle
 		}
@@ -245,6 +257,7 @@ ParserReturnVal_t CmdSetSpeed(int mode) {
 	//RPM to ticks for desiredSpeed
 	RPMtoTicks = (float)(userSpeed*TICKS_PER_REV)/(60000/SAMPLING_RATE);
 	desiredSpeed = (int32_t) RPMtoTicks;
+	controlAdjustedSpeed = desiredSpeed;
 	
 	DC(userSpeed,direction);
 	return CmdReturnOk;
