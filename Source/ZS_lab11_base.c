@@ -89,8 +89,6 @@ void controlInit(void *data){
 	sConfig.OCNIdleState = TIM_OCNIDLESTATE_RESET;
 	HAL_TIM_PWM_ConfigChannel(&tim1, &sConfig, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_1);
-	HAL_TIM_PWM_ConfigChannel(&tim1, &sConfig, TIM_CHANNEL_2);
-	HAL_TIM_PWM_Start(&tim1, TIM_CHANNEL_2);
 	
 	/*********************Encoder****************************************/
 	//configure GPIO pins	
@@ -319,10 +317,9 @@ void DC(uint16_t userSpeed, uint16_t direction){//RPM to dutyCycle conversion in
 	dutyCycle =((float)userSpeed/MAX_RPM)*100;
 	dutyCycle = dutyCycle * 10;	//scaling up so that 100% duty cycle corresponds to 1000 (pulse = period = 1000)
 	TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
-	//checking channel
   
-	TIM1->CCR1 = (uint16_t) dutyCycle;              //setting new duty cycle for channel 1 
-	TIM1->CCER &= 0xFFFFFFFC;	     //enabling channel1 output
+	TIM1->CCR1 = (uint16_t) dutyCycle;              //setting new duty cycle 
+	TIM1->CCER &= 0xFFFFFFFC;	     //enabling channel output
 	TIM1->CCER |= 0x01;
 	
 	if(direction == 1){//Clockwise
