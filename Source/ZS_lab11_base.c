@@ -1,7 +1,7 @@
 /* 	ZS_lab11.c
  *	PID DC Motor controls
  * 	Programmed by: Shamseddin Elmasri & Ziyad Mekhemer
- *	Date: April 15, 2020
+ *	Date: Apr 15, 2020
  */
  
  /* Remaining tasks
@@ -187,10 +187,14 @@ void controlTask(void *data){
 ADD_TASK(controlTask, controlInit, NULL, 100, "DC motor control task")
 
 ParserReturnVal_t CmdSpeed(int mode) {
-
+	
+	float TickstoRPM;
+	
 	if (mode != CMD_INTERACTIVE) return CmdReturnOk;
+	
+	TickstoRPM = (float)(controlMeasuredSpeed * 600)/TICKS_PER_REV;
 
-	printf("Speed in Ticks %ld\n",controlMeasuredSpeed);
+	printf("Speed in RPM %.1f\n",TickstoRPM);
 	return CmdReturnOk;
 }
 ADD_CMD("speed", CmdSpeed, "	      Prints the speed of the DC motor.")
