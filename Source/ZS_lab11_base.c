@@ -261,7 +261,7 @@ ParserReturnVal_t CmdSetSpeed(int mode) {
 }
 ADD_CMD("setSpeed", CmdSetSpeed, "	      <direction> <speed> Sets the speed of the DC motor")
 
-//This command is used to set the PIDStartDelay and the constants for PID control.
+//This command is used to set the constants for PID control.
 ParserReturnVal_t CmdPIDcontrol(int mode) {
 	float userKP;
 	float userKI;
@@ -292,7 +292,7 @@ ParserReturnVal_t CmdPIDcontrol(int mode) {
 	
 	return CmdReturnOk;
 }
-ADD_CMD("PIDcontrol", CmdPIDcontrol, "	      <PIDStartDelay> <KP> <KI> <KD> Change the constants for PID control.")
+ADD_CMD("PIDcontrol", CmdPIDcontrol, "	       <KP> <KI> <KD> Change the constants for PID control.")
 
 
 //DC motor functions
