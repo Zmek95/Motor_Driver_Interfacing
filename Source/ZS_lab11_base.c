@@ -1,22 +1,17 @@
 /* 	ZS_lab11.c
- *	DC Motor controls
+ *	PID DC Motor controls
  * 	Programmed by: Shamseddin Elmasri & Ziyad Mekhemer
- *	Date: Mar 19, 2020
+ *	Date: Apr 16, 2020
  */
- 
- /* Remaining tasks
-  * 1. Change P type control values to use floats or fixed point math
-  * 
-  *
-  */
  
 #include <stdio.h>
 #include <stdint.h>
 #include "common.h"
 
-#define KP 1 //propotional constant for P type control
+#define SAMPLING_RATE 100// time in milliseconds
 #define TICKS_PER_REV 198.6
 #define MAX_RPM 155 //No - load speed of the motor
+#define PID_START_DELAY 5 //Start delay before PID control is applied, delay is a multiple of sampling rate
 
 //global TypeDefs
 GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
@@ -25,18 +20,27 @@ TIM_HandleTypeDef tim1;
 TIM_HandleTypeDef tim3;
 TIM_Encoder_InitTypeDef encoderConfig;
 //global variables
-int32_t controlMeasuredSpeed;
-int16_t previousPosition;
-int32_t desiredSpeed;
-int PIDStartDelay = 10;
-uint16_t direction;
+uint16_t direction;//DC motor direction of rotation
+uint16_t PIDStartDelay = PID_START_DELAY;//Delay before PID control is applied, time base is SAMPLING_RATE
+int16_t previousPosition;//Used to determine the speed of the motor, the position of the encoder at the previous sample.
+int32_t controlMeasuredSpeed;//speed measured by the encoder
+int32_t desiredSpeed;//The speed entered by the user
+float controlAdjustedSpeed;//Adjusted speed due to PID control
+float integralError = 0;//Accumalted I error 
+float previousError = 0;//error value that was determined at the previous sample
+float KP = 6;//Propotional constant for P type control
+float KI = 2;//Integral constant for I type control
+float KD = 1;//Derivative constant for D type control
 
 //funtion declarations
 uint16_t readEncoder(void);//might do RPM conversion here
 void motorStop(void);
 void DC(uint16_t userSpeed, uint16_t direction);
 
-
+// FUNCTION      : controlInit
+// DESCRIPTION   : This function initializes the GPIOs, timers and encoders to enable PID control for the DC motor
+// PARAMETERS    : Nothing
+// RETURNS       : Nothing
 void controlInit(void *data){
 	
 	
@@ -143,12 +147,18 @@ void controlInit(void *data){
 	previousPosition = 0;
 }
 
+
+/*********************************************Commands & Tasks*********************************************************/
+
+
+//This task measures the speed of the motor and applies PID control depending on the SAMPLING_RATE
 void controlTask(void *data){
 	
 	uint16_t currentPosition;
 	uint32_t difference;
-	int32_t errorValue;//Change to float for task 1
-	int32_t controlAdjustedSpeed = 0;//Change to float for task 1
+	float errorValue;
+	float derivativeError;
+	float proportionalError;
 	uint16_t controlAdjustedSpeedRPM;
 	float TickstoRPM;
 	
@@ -161,79 +171,128 @@ void controlTask(void *data){
 	previousPosition = currentPosition;
 	controlMeasuredSpeed = difference;
 	
-	//allow for 1 second to pass before PID control is applied
+	//A delay is applied before PID control begins
 	//PID control
-	if(desiredSpeed > 0 && PIDStartDelay == 0){
+	if(desiredSpeed > 0 && PIDStartDelay <= 1){
+		//Negative error values for overshoot, positive error values for undershoot
 		
-		if (controlMeasuredSpeed > desiredSpeed){
-			errorValue = controlMeasuredSpeed - desiredSpeed;
-		}else{
-			errorValue = desiredSpeed - controlMeasuredSpeed;
-		}
-		errorValue = KP * errorValue;
-		if(errorValue != 0){
-			if(desiredSpeed > controlMeasuredSpeed){
-				controlAdjustedSpeed = errorValue + desiredSpeed;
-			}else{
-				controlAdjustedSpeed = desiredSpeed - errorValue;
-			}
-			//RPM conversion here
-			//(RawTicksValue*600)/198.6
-			TickstoRPM = (float)(controlAdjustedSpeed * 600)/TICKS_PER_REV;
+		errorValue = desiredSpeed - controlMeasuredSpeed;
+		
+		proportionalError = KP * errorValue;
+		integralError = errorValue + integralError;
+		derivativeError = KD*(errorValue - previousError);
+		
+		previousError = errorValue;
+		errorValue = proportionalError + (KI*integralError) + derivativeError;
+		
+		if(errorValue != 0 && PIDStartDelay == 0){
+		
+			controlAdjustedSpeed = errorValue + controlAdjustedSpeed;
+			//RPM conversion
+			//(RawTicksValue*(60000/SAMPLING_RATE))/198.6
+			TickstoRPM = (float)(controlAdjustedSpeed * (60000/SAMPLING_RATE))/TICKS_PER_REV;
 			controlAdjustedSpeedRPM = (uint16_t) TickstoRPM;
-			DC(controlAdjustedSpeedRPM,direction); //controlAdjustedSpeed needs to be converted to a duty cycle
+			DC(controlAdjustedSpeedRPM,direction); //error needs to be converted to a duty cycle
+		}else if(PIDStartDelay == 1){//decrement once after PID error is calcualted so previousError is intiallized 
+			PIDStartDelay--;
 		}
+		
 	}else{
-		PIDStartDelay--;
-		if(PIDStartDelay < 0){
-			PIDStartDelay = 0;
+		if(PIDStartDelay >= 0){
+			PIDStartDelay--;
 		}
 	}
-	
-	
 }
-ADD_TASK(controlTask, controlInit, NULL, 100, "DC motor control task")
+ADD_TASK(controlTask, controlInit, NULL, SAMPLING_RATE, "                       DC motor control task")
 
+//This command returns the measured speed of the motor in RPM.
 ParserReturnVal_t CmdSpeed(int mode) {
-
+	
+	float TickstoRPM;
+	
 	if (mode != CMD_INTERACTIVE) return CmdReturnOk;
+	
+	TickstoRPM = (float)(controlMeasuredSpeed * (60000/SAMPLING_RATE))/TICKS_PER_REV;
 
-	printf("Speed in Ticks %ld\n",controlMeasuredSpeed);
+	printf("Speed in RPM %.1f\n",TickstoRPM);
 	return CmdReturnOk;
 }
 ADD_CMD("speed", CmdSpeed, "	      Prints the speed of the DC motor.")
 
+//This command is used to set the direction and speed(RPM) of the motor.
 ParserReturnVal_t CmdSetSpeed(int mode) {
 	//Unit conversions placed here
 	uint16_t userSpeed = 0;//used to control speed of motor (RPM)
+	uint16_t userDirection = 0; 
 	float RPMtoTicks;
 	uint16_t rc;
-	PIDStartDelay = 10;
+	PIDStartDelay = PID_START_DELAY;
 	
 	if (mode != CMD_INTERACTIVE) return CmdReturnOk;
 	
-	rc = fetch_uint16_arg(&direction);	//inputting direction number from user
+	rc = fetch_uint16_arg(&userDirection);	//inputting direction number from user
 	if (rc) {
-		printf("Please select direction of rotation\n");
+		printf("Please select direction of rotation (0,1,2)\n");
 		return CmdReturnBadParameter1;
 	}
 	rc = fetch_uint16_arg(&userSpeed);	//inputting speed from user
-    if (rc) {
-		printf("Please enter the speed, (0 to 100)\n");
+	if (rc) {
+		printf("Please enter a valid integer for the speed\n");
 		return CmdReturnBadParameter2;
-    }
+	}
+	
+	if(userDirection > 2){
+		printf("Please enter a valid direction, 0 for stop, 1 for clockwise , 2 for anti-clockwise\n");
+		return CmdReturnBadParameter1;
+	}
+	if(userSpeed > 155 || userSpeed == 0){
+		printf("Please enter a valid positive integer for speed, maximum RPM is MAX_RPM\n");
+		return CmdReturnBadParameter2;
+	}
 
+	direction = userDirection;
 	//RPM to ticks for desiredSpeed
-	RPMtoTicks = (float)(userSpeed*TICKS_PER_REV)/600;
+	RPMtoTicks = (float)(userSpeed*TICKS_PER_REV)/(60000/SAMPLING_RATE);
 	desiredSpeed = (int32_t) RPMtoTicks;
+	controlAdjustedSpeed = desiredSpeed;
 	
 	DC(userSpeed,direction);
 	return CmdReturnOk;
 }
-ADD_CMD("setSpeed", CmdSetSpeed, "	      Prints the speed of the DC motor.")
+ADD_CMD("setSpeed", CmdSetSpeed, "	      <direction> <speed> Sets the speed of the DC motor")
 
-
-
+//This command is used to set the constants for PID control.
+ParserReturnVal_t CmdPIDcontrol(int mode) {
+	float userKP;
+	float userKI;
+	float userKD;
+	uint16_t rc;
+	
+	if (mode != CMD_INTERACTIVE) return CmdReturnOk;
+	
+	rc = fetch_float_arg(&userKP);	//inputting KP constant from user
+	if (rc) {
+		printf("Please enter a valid positive integer for PID constants\n");
+		return CmdReturnBadParameter1;
+	}
+	rc = fetch_float_arg(&userKI);	//inputting KI constant from user
+	if (rc) {
+		printf("Please enter a valid positive integer for PID constants\n");
+		return CmdReturnBadParameter1;
+	}
+	rc = fetch_float_arg(&userKD);	//inputting KD constant from user
+	if (rc) {
+		printf("Please enter a valid positive integer for PID constants\n");
+		return CmdReturnBadParameter1;
+	}
+	
+	KP = userKP;
+	KI = userKI;
+	KD = userKD;
+	
+	return CmdReturnOk;
+}
+ADD_CMD("PIDcontrol", CmdPIDcontrol, "	       <KP> <KI> <KD> Change the constants for PID control.")
 
 
 //DC motor functions
@@ -265,12 +324,15 @@ void DC(uint16_t userSpeed, uint16_t direction){//RPM to dutyCycle conversion in
 	TIM1->CCR1 = (uint16_t) dutyCycle;              //setting new duty cycle for channel 1 
 	TIM1->CCER &= 0xFFFFFFFC;	     //enabling channel1 output
 	TIM1->CCER |= 0x01;
-	if(direction == 1){              //checking direction
+	
+	if(direction == 1){//Clockwise
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 0);
-	}else{
+	}else if(direction == 2){//Anti - Clockwise
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 0);
 		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, 1);
+	}else if(direction == 0){// Stop
+		motorStop();
 	}
   
 	TIM1->CR1 |= TIM_CR1_CEN;	//resuming timer
