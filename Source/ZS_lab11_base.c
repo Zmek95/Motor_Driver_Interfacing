@@ -11,6 +11,7 @@
 #define SAMPLING_RATE 100// time in milliseconds
 #define TICKS_PER_REV 198.6
 #define MAX_RPM 155 //No - load speed of the motor
+#define PID_START_DELAY 5 //Start delay before PID control is applied, delay is a multiple of sampling rate
 
 //global TypeDefs
 GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
@@ -20,7 +21,7 @@ TIM_HandleTypeDef tim3;
 TIM_Encoder_InitTypeDef encoderConfig;
 //global variables
 uint16_t direction;//DC motor direction of rotation
-uint16_t PIDStartDelay = 10;//Delay before PID control is applied, time base is SAMPLING_RATE
+uint16_t PIDStartDelay = PID_START_DELAY;//Delay before PID control is applied, time base is SAMPLING_RATE
 int16_t previousPosition;//Used to determine the speed of the motor, the position of the encoder at the previous sample.
 int32_t controlMeasuredSpeed;//speed measured by the encoder
 int32_t desiredSpeed;//The speed entered by the user
@@ -225,7 +226,7 @@ ParserReturnVal_t CmdSetSpeed(int mode) {
 	uint16_t userDirection = 0; 
 	float RPMtoTicks;
 	uint16_t rc;
-	PIDStartDelay = 10;
+	PIDStartDelay = PID_START_DELAY;
 	
 	if (mode != CMD_INTERACTIVE) return CmdReturnOk;
 	
@@ -262,7 +263,6 @@ ADD_CMD("setSpeed", CmdSetSpeed, "	      <direction> <speed> Sets the speed of t
 
 //This command is used to set the PIDStartDelay and the constants for PID control.
 ParserReturnVal_t CmdPIDcontrol(int mode) {
-	uint16_t userPIDStartDelay;
 	float userKP;
 	float userKI;
 	float userKD;
@@ -270,28 +270,22 @@ ParserReturnVal_t CmdPIDcontrol(int mode) {
 	
 	if (mode != CMD_INTERACTIVE) return CmdReturnOk;
 	
-	rc = fetch_uint16_arg(&userPIDStartDelay);	//inputting direction number from user
+	rc = fetch_float_arg(&userKP);	//inputting KP constant from user
 	if (rc) {
-		printf("Please enter a valid positive integer for delay, time base is SAMPLING_RATE\n");
+		printf("Please enter a valid positive integer for PID constants\n");
 		return CmdReturnBadParameter1;
 	}
-	rc = fetch_float_arg(&userKP);	//inputting direction number from user
+	rc = fetch_float_arg(&userKI);	//inputting KI constant from user
 	if (rc) {
 		printf("Please enter a valid positive integer for PID constants\n");
-		return CmdReturnBadParameter2;
+		return CmdReturnBadParameter1;
 	}
-	rc = fetch_float_arg(&userKI);	//inputting direction number from user
+	rc = fetch_float_arg(&userKD);	//inputting KD constant from user
 	if (rc) {
 		printf("Please enter a valid positive integer for PID constants\n");
-		return CmdReturnBadParameter2;
-	}
-	rc = fetch_float_arg(&userKD);	//inputting direction number from user
-	if (rc) {
-		printf("Please enter a valid positive integer for PID constants\n");
-		return CmdReturnBadParameter2;
+		return CmdReturnBadParameter1;
 	}
 	
-	PIDStartDelay = userPIDStartDelay;
 	KP = userKP;
 	KI = userKI;
 	KD = userKD;
