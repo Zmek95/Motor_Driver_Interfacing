@@ -75,7 +75,7 @@ void controlInit(void *data){
   tim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   tim1.Init.RepetitionCounter = 0;
   //Configuring enable bits for TIM1
-  TIM1 -> CR1 |= (TIM_CR1_URS); //only counter over/under flow generates interrupt
+  TIM1 -> CR1 |= TIM_CR1_URS; //only counter over/under flow generates interrupt
   TIM1 -> DIER |= TIM_DIER_CC1IE; //setting Update Interrupt Enable bit 
   TIM1 -> EGR |= TIM_EGR_UG; //setting Update Generation bit 
   HAL_TIM_Base_Init(&tim1);
@@ -319,7 +319,7 @@ void DC(uint16_t userSpeed, uint16_t direction){//RPM to dutyCycle conversion in
   TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
   
   TIM1->CCR1 = (uint16_t) dutyCycle;              //setting new duty cycle 
-  TIM1->CCER &= 0xFFFFFFFC;	     //enabling channel output
+  TIM1->CCER &= ~(TIM_CCER_CC1P);	     //enabling channel output
   TIM1->CCER |= TIM_CCER_CC1E;
 	
   if(direction == 1){//Clockwise
