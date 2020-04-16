@@ -174,9 +174,7 @@ void controlTask(void *data){
 	//PID control
 	if(desiredSpeed > 0 && PIDStartDelay <= 1){
 		//Negative error values for overshoot, positive error values for undershoot
-		if (PIDStartDelay == 1){
-			PIDStartDelay--;
-		}
+		
 		errorValue = desiredSpeed - controlMeasuredSpeed;
 		
 		proportionalError = KP * errorValue;
@@ -200,7 +198,9 @@ void controlTask(void *data){
 			PIDStartDelay--;
 		}
 	}
-	
+	if (PIDStartDelay == 1){//decrement once after previous error contains an error value
+		PIDStartDelay--;
+	}
 	
 }
 ADD_TASK(controlTask, controlInit, NULL, SAMPLING_RATE, "                       DC motor control task")
