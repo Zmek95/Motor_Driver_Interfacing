@@ -192,16 +192,15 @@ void controlTask(void *data){
 			TickstoRPM = (float)(controlAdjustedSpeed * (60000/SAMPLING_RATE))/TICKS_PER_REV;
 			controlAdjustedSpeedRPM = (uint16_t) TickstoRPM;
 			DC(controlAdjustedSpeedRPM,direction); //error needs to be converted to a duty cycle
+		}else if(PIDStartDelay == 1){//decrement once after PID error is calcualted so previousError is intiallized 
+			PIDStartDelay--;
 		}
+		
 	}else{
 		if(PIDStartDelay >= 0){
 			PIDStartDelay--;
 		}
 	}
-	if (PIDStartDelay == 1){//decrement once after previous error contains an error value
-		PIDStartDelay--;
-	}
-	
 }
 ADD_TASK(controlTask, controlInit, NULL, SAMPLING_RATE, "                       DC motor control task")
 
