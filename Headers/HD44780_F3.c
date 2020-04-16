@@ -1,14 +1,13 @@
 /*#############################################################
  Driver name	 : HD44780_F3.c
- Author			 : Grant Phillips / Revised by Allan Smith/Rudy Hofer for Atollic Truestudio
- Date Modified   : 12/21/2016
- Compiler        : Atollic TrueStudio
- Tested On       : STM32F3-Discovery/STM32L432 Nucleo32
+ Author			 : Grant Phillips / Revised by Allan Smith/Rudy Hofer for Atollic Truestudio / Edited by Shamseddin Elmasri for stm32f3xx
+ Date Modified   : 04/12/2020
+ 
+ Tested On       : STM32f303 Nucleo64 board
 
  Description	 : Provides a library to access a HD44780-based
  character LCD module.
 
- Requirements    : * STM32F3-Discovery Board/STM32L432 Nucleo32
  * Define the custom configurations on line
  80 to 112 in this file.
 
