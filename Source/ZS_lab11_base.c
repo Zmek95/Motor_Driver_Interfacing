@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include "common.h"
 
-#define SAMPLING_RATE 100
+#define SAMPLING_RATE 100// time in milliseconds
 #define TICKS_PER_REV 198.6
 #define MAX_RPM 155 //No - load speed of the motor
 
@@ -172,7 +172,7 @@ void controlTask(void *data){
 	
 	//A delay is applied before PID control begins
 	//PID control
-	if(desiredSpeed > 0 && PIDStartDelay == 1){
+	if(desiredSpeed > 0 && PIDStartDelay <= 1){
 		//Negative error values for overshoot, positive error values for undershoot
 		errorValue = desiredSpeed - controlMeasuredSpeed;
 		
