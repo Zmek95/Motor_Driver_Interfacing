@@ -174,6 +174,9 @@ void controlTask(void *data){
 	//PID control
 	if(desiredSpeed > 0 && PIDStartDelay <= 1){
 		//Negative error values for overshoot, positive error values for undershoot
+		if (PIDStartDelay == 1){
+			PIDStartDelay--;
+		}
 		errorValue = desiredSpeed - controlMeasuredSpeed;
 		
 		proportionalError = KP * errorValue;
