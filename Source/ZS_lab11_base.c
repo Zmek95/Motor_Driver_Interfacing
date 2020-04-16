@@ -57,8 +57,8 @@ void controlInit(void *data){
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
 	GPIO_InitStruct.Alternate = 0;
 	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-	//configuring GPIO pins for PWM outputs
-	GPIO_InitStruct.Pin = GPIO_PIN_8 | GPIO_PIN_9;
+	//configuring GPIO pin for PWM output
+	GPIO_InitStruct.Pin = GPIO_PIN_8;
 	GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
 	GPIO_InitStruct.Pull = GPIO_NOPULL;
 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
