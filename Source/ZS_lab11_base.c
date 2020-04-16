@@ -320,7 +320,7 @@ void DC(uint16_t userSpeed, uint16_t direction){//RPM to dutyCycle conversion in
   
   TIM1->CCR1 = (uint16_t) dutyCycle;              //setting new duty cycle 
   TIM1->CCER &= 0xFFFFFFFC;	     //enabling channel output
-  TIM1->CCER |= 0x01;
+  TIM1->CCER |= TIM_CCER_CC1E;
 	
   if(direction == 1){//Clockwise
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, 1);
