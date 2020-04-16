@@ -5,16 +5,19 @@
  */
  
  /* Remaining tasks
-  * None
-  * 
-  *
+  * 1. D term needs to be sampled over a larger amount of points to reduce noise,
+  *    so a linear regression needs to be done over a few error values (e.g 10 previous 
+  *    errors) to calculate the derivative.
   */
  
 #include <stdio.h>
 #include <stdint.h>
 #include "common.h"
 
-#define KP 0.05 //propotional constant for P type control
+#define SAMPLING_RATE 100
+#define KP 6 //Propotional constant for P type control
+#define KI 2 //Integral constant for I type control
+#define KD 1 //Derivative constant for D type control
 #define TICKS_PER_REV 198.6
 #define MAX_RPM 155 //No - load speed of the motor
 
@@ -30,6 +33,8 @@ int16_t previousPosition;
 int32_t desiredSpeed;
 int PIDStartDelay = 10;
 uint16_t direction;
+float integralError = 0;
+float previousError = 0;
 
 //funtion declarations
 uint16_t readEncoder(void);//might do RPM conversion here
@@ -147,8 +152,10 @@ void controlTask(void *data){
 	
 	uint16_t currentPosition;
 	uint32_t difference;
-	float errorValue;//Change to float for task 1
-	float controlAdjustedSpeed = 0;//Change to float for task 1
+	float errorValue;
+	float derivativeError;
+	float proportionalError;
+	float controlAdjustedSpeed = 0;
 	uint16_t controlAdjustedSpeedRPM;
 	float TickstoRPM;
 	
@@ -163,16 +170,23 @@ void controlTask(void *data){
 	
 	//allow for 1 second to pass before PID control is applied
 	//PID control
-	if(desiredSpeed > 0 && PIDStartDelay == 0){
+	if(desiredSpeed > 0 && PIDStartDelay == 1){
 		//Negative error values for overshoot, positive error values for undershoot
 		errorValue = desiredSpeed - controlMeasuredSpeed;
-		errorValue = KP * errorValue;
-		if(errorValue != 0){
+		
+		proportionalError = KP * errorValue;
+		integralError = errorValue + integralError;
+		derivativeError = KD*(errorValue - previousError);
+		
+		previousError = errorValue;
+		errorValue = proportionalError + (KI*integralError) + derivativeError;
+		
+		if(errorValue != 0 && PIDStartDelay == 0){
 			
 			controlAdjustedSpeed = errorValue + (float)desiredSpeed;
 			//RPM conversion here
-			//(RawTicksValue*600)/198.6
-			TickstoRPM = (float)(controlAdjustedSpeed * 600)/TICKS_PER_REV;
+			//(RawTicksValue*(60000/SAMPLING_RATE))/198.6
+			TickstoRPM = (float)(controlAdjustedSpeed * (60000/SAMPLING_RATE))/TICKS_PER_REV;
 			controlAdjustedSpeedRPM = (uint16_t) TickstoRPM;
 			DC(controlAdjustedSpeedRPM,direction); //controlAdjustedSpeed needs to be converted to a duty cycle
 		}
@@ -184,7 +198,7 @@ void controlTask(void *data){
 	
 	
 }
-ADD_TASK(controlTask, controlInit, NULL, 100, "DC motor control task")
+ADD_TASK(controlTask, controlInit, NULL, SAMPLING_RATE, "DC motor control task")
 
 ParserReturnVal_t CmdSpeed(int mode) {
 	
@@ -192,7 +206,7 @@ ParserReturnVal_t CmdSpeed(int mode) {
 	
 	if (mode != CMD_INTERACTIVE) return CmdReturnOk;
 	
-	TickstoRPM = (float)(controlMeasuredSpeed * 600)/TICKS_PER_REV;
+	TickstoRPM = (float)(controlMeasuredSpeed * (60000/SAMPLING_RATE))/TICKS_PER_REV;
 
 	printf("Speed in RPM %.1f\n",TickstoRPM);
 	return CmdReturnOk;
@@ -220,7 +234,7 @@ ParserReturnVal_t CmdSetSpeed(int mode) {
     }
 
 	//RPM to ticks for desiredSpeed
-	RPMtoTicks = (float)(userSpeed*TICKS_PER_REV)/600;
+	RPMtoTicks = (float)(userSpeed*TICKS_PER_REV)/(60000/SAMPLING_RATE);
 	desiredSpeed = (int32_t) RPMtoTicks;
 	
 	DC(userSpeed,direction);
