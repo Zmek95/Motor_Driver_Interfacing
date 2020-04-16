@@ -1,6 +1,6 @@
 /*#############################################################
  Driver name	 : HD44780_F3.c
- Author			 : Grant Phillips / Revised by Allan Smith/Rudy Hofer for Atollic Truestudio / Edited by Shamseddin Elmasri for stm32f3xx
+ Author		 : Grant Phillips / Revised by Allan Smith/Rudy Hofer for Atollic Truestudio / Edited by Shamseddin Elmasri for stm32f3xx
  Date Modified   : 04/12/2020
  
  Tested On       : STM32f303 Nucleo64 board
