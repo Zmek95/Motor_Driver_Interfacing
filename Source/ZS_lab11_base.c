@@ -31,6 +31,7 @@ TIM_Encoder_InitTypeDef encoderConfig;
 int32_t controlMeasuredSpeed;
 int16_t previousPosition;
 int32_t desiredSpeed;
+float controlAdjustedSpeed;
 int PIDStartDelay = 10;
 uint16_t direction;
 float integralError = 0;
@@ -155,7 +156,6 @@ void controlTask(void *data){
 	float errorValue;
 	float derivativeError;
 	float proportionalError;
-	float controlAdjustedSpeed = 0;
 	uint16_t controlAdjustedSpeedRPM;
 	float TickstoRPM;
 	
@@ -172,7 +172,7 @@ void controlTask(void *data){
 	//PID control
 	if(desiredSpeed > 0 && PIDStartDelay == 1){
 		//Negative error values for overshoot, positive error values for undershoot
-		errorValue = desiredSpeed - controlMeasuredSpeed;
+		errorValue = controlAdjustedSpeed - controlMeasuredSpeed;
 		
 		proportionalError = KP * errorValue;
 		integralError = errorValue + integralError;
@@ -183,7 +183,7 @@ void controlTask(void *data){
 		
 		if(errorValue != 0 && PIDStartDelay == 0){
 			
-			controlAdjustedSpeed = errorValue + (float)desiredSpeed;
+			controlAdjustedSpeed = errorValue + controlAdjustedSpeed;
 			//RPM conversion here
 			//(RawTicksValue*(60000/SAMPLING_RATE))/198.6
 			TickstoRPM = (float)(controlAdjustedSpeed * (60000/SAMPLING_RATE))/TICKS_PER_REV;
@@ -236,6 +236,7 @@ ParserReturnVal_t CmdSetSpeed(int mode) {
 	//RPM to ticks for desiredSpeed
 	RPMtoTicks = (float)(userSpeed*TICKS_PER_REV)/(60000/SAMPLING_RATE);
 	desiredSpeed = (int32_t) RPMtoTicks;
+	controlAdjustedSpeed = desiredSpeed;
 	
 	DC(userSpeed,direction);
 	return CmdReturnOk;
