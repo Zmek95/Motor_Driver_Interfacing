@@ -238,11 +238,11 @@ ParserReturnVal_t CmdSetSpeed(int mode) {
 		return CmdReturnBadParameter2;
     }
 	
-	if(direction > 2){
+	if(userDirection > 2){
 		printf("Please enter a valid direction, 0 for stop, 1 for clockwise , 2 for anti-clockwise\n");
 		return CmdReturnBadParameter1;
 	}
-	if(speed > 155 || speed == 0){
+	if(userSpeed > 155 || userSpeed == 0){
 		printf("Please enter a valid positive integer for speed, maximum RPM is MAX_RPM\n");
 		return CmdReturnBadParameter2;
 	}
