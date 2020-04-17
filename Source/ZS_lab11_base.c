@@ -8,10 +8,10 @@
 #include <stdint.h>
 #include "common.h"
 
-#define SAMPLING_RATE 100// time in milliseconds
+#define SAMPLING_RATE 100   // time in milliseconds
 #define TICKS_PER_REV 198.6
-#define MAX_RPM 155 //No - load speed of the motor
-#define PID_START_DELAY 5 //Start delay before PID control is applied, delay is a multiple of sampling rate
+#define MAX_RPM 155         //No - load speed of the motor
+#define PID_START_DELAY 5   //Start delay before PID control is applied, delay is a multiple of sampling rate
 
 //global TypeDefs
 GPIO_InitTypeDef  GPIO_InitStruct = { 0 };
@@ -20,20 +20,20 @@ TIM_HandleTypeDef tim1;
 TIM_HandleTypeDef tim3;
 TIM_Encoder_InitTypeDef encoderConfig;
 //global variables
-uint16_t direction;//DC motor direction of rotation
-uint16_t PIDStartDelay = PID_START_DELAY;//Delay before PID control is applied, time base is SAMPLING_RATE
-int16_t previousPosition;//Used to determine the speed of the motor, the position of the encoder at the previous sample.
-int32_t controlMeasuredSpeed;//speed measured by the encoder
-int32_t desiredSpeed;//The speed entered by the user
-float controlAdjustedSpeed;//Adjusted speed due to PID control
-float integralError = 0;//Accumalted I error 
-float previousError = 0;//error value that was determined at the previous sample
-float KP = 6;//Propotional constant for P type control
-float KI = 2;//Integral constant for I type control
-float KD = 1;//Derivative constant for D type control
+uint16_t direction;                       //DC motor direction of rotation
+uint16_t PIDStartDelay = PID_START_DELAY; //Delay before PID control is applied, time base is SAMPLING_RATE
+int16_t previousPosition;                 //Used to determine the speed of the motor, the position of the encoder at the previous sample.
+int32_t controlMeasuredSpeed;             //speed measured by the encoder
+int32_t desiredSpeed;                     //The speed entered by the user
+float controlAdjustedSpeed;               //Adjusted speed due to PID control
+float integralError = 0;                  //Accumalted I error 
+float previousError = 0;                  //error value that was determined at the previous sample
+float KP = 6;                             //Propotional constant for P type control
+float KI = 2;                             //Integral constant for I type control
+float KD = 1;                             //Derivative constant for D type control
 
 //funtion declarations
-uint16_t readEncoder(void);//might do RPM conversion here
+uint16_t readEncoder(void);
 void motorStop(void);
 void DC(uint16_t userSpeed, uint16_t direction);
 
@@ -42,8 +42,7 @@ void DC(uint16_t userSpeed, uint16_t direction);
 // PARAMETERS    : Nothing
 // RETURNS       : Nothing
 void controlInit(void *data){
-	
-	
+
   HAL_StatusTypeDef rc;
 	
   // Enabling clock for GPIOs
@@ -139,15 +138,12 @@ void controlInit(void *data){
     printf("Failed to start Timer 3 Encoder, rc=%u\n",rc);
     return;
   }
-	
   desiredSpeed = 0;
   controlMeasuredSpeed = 0;
   previousPosition = 0;
 }
 
-
 /*********************************************Commands & Tasks*********************************************************/
-
 
 //This task measures the speed of the motor and applies PID control depending on the SAMPLING_RATE
 void controlTask(void *data){
@@ -176,12 +172,12 @@ void controlTask(void *data){
 		
     errorValue = desiredSpeed - controlMeasuredSpeed;
 		
-    proportionalError = KP * errorValue;
+    proportionalError = errorValue;
     integralError = errorValue + integralError;
-    derivativeError = KD*(errorValue - previousError);
+    derivativeError = errorValue - previousError;
 		
     previousError = errorValue;
-    errorValue = proportionalError + (KI*integralError) + derivativeError;
+    errorValue = (KP * proportionalError) + (KI * integralError) + (KD * derivativeError);
 		
     if(errorValue != 0 && PIDStartDelay == 0){
 		
@@ -194,7 +190,7 @@ void controlTask(void *data){
     }else if(PIDStartDelay == 1){//decrement once after PID error is calcualted so previousError is intiallized 
       PIDStartDelay--;
     }
-		
+    
   }else{
     if(PIDStartDelay >= 0){
       PIDStartDelay--;
@@ -315,10 +311,10 @@ void DC(uint16_t userSpeed, uint16_t direction){//RPM to dutyCycle conversion in
   float dutyCycle;
 	
   dutyCycle =((float)userSpeed/MAX_RPM)*100;
-  dutyCycle = dutyCycle * 10;	//scaling up so that 100% duty cycle corresponds to 1000 (pulse = period = 1000)
-  TIM1->CR1 &= ~TIM_CR1_CEN;	//stopping timer
+  dutyCycle = dutyCycle * 10;	             //scaling up so that 100% duty cycle corresponds to 1000 (pulse = period = 1000)
+  TIM1->CR1 &= ~TIM_CR1_CEN;	             //stopping timer
   
-  TIM1->CCR1 = (uint16_t) dutyCycle;              //setting new duty cycle 
+  TIM1->CCR1 = (uint16_t) dutyCycle;         //setting new duty cycle 
   TIM1->CCER &= ~(TIM_CCER_CC1P);	     //enabling channel output
   TIM1->CCER |= TIM_CCER_CC1E;
 	
@@ -344,4 +340,3 @@ uint16_t readEncoder(void){
   encoderValue = TIM3->CNT;
   return encoderValue;
 }
-  
