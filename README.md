@@ -5,6 +5,6 @@ The simple monitor program used to interface the microcontroller was provided by
 
 Gerber files are also provided for the PCB for the motor driver controller
 
-Source code has been programmed by Ziyad Mekhemer and Shammseddin Elmasri
+Source code has been programmed by Ziyad Mekhemer and Shamseddin Elmasri
 
-Board files were designed by Ziyad Mekhemer and Shammseddin Elmasri
+Board files were designed by Ziyad Mekhemer and Shamseddin Elmasri
